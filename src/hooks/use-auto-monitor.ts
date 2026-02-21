@@ -30,6 +30,7 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastFrameRef = useRef<string>('');
+  const lastCardsRef = useRef<string>('');
   
   const [state, setState] = useState<MonitorState>({
     isMonitoring: false,
@@ -89,20 +90,27 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       const data = await response.json();
       
       if (data.success && data.gameState?.heroCards?.length >= 2) {
-        setState(prev => ({
-          ...prev,
-          cardsDetected: true,
-          lastCards: data.gameState.heroCards
-        }));
+        const newCards = data.gameState.heroCards.join(',') + '|' + data.gameState.board.join(',');
         
-        config.onDetect({
-          heroCards: data.gameState.heroCards,
-          board: data.gameState.board || [],
-          potSize: data.gameState.potSize || 0,
-          imageData
-        });
-        
-        return true;
+        // Só notificar se as cartas mudaram
+        if (newCards !== lastCardsRef.current) {
+          lastCardsRef.current = newCards;
+          
+          setState(prev => ({
+            ...prev,
+            cardsDetected: true,
+            lastCards: data.gameState.heroCards
+          }));
+          
+          config.onDetect({
+            heroCards: data.gameState.heroCards,
+            board: data.gameState.board || [],
+            potSize: data.gameState.potSize || 0,
+            imageData
+          });
+          
+          return true;
+        }
       }
       
       return false;
@@ -124,12 +132,20 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       lastCapture: new Date()
     }));
     
+    config.onChange({
+      isMonitoring: true,
+      lastCapture: new Date(),
+      framesAnalyzed: state.framesAnalyzed + 1,
+      cardsDetected: state.cardsDetected,
+      lastCards: state.lastCards
+    });
+    
     // Verificar se houve mudança
     if (hasSignificantChange(frame)) {
       console.log('🔄 Mudança detectada, analisando...');
       await analyzeFrame(frame);
     }
-  }, [captureFrame, hasSignificantChange, analyzeFrame]);
+  }, [captureFrame, hasSignificantChange, analyzeFrame, config, state]);
 
   // Parar monitoramento (declarado antes de startMonitoring para evitar erro de referência)
   const stopMonitoring = useCallback(() => {
@@ -146,6 +162,7 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
     videoRef.current = null;
     canvasRef.current = null;
     lastFrameRef.current = '';
+    lastCardsRef.current = '';
     
     setState(prev => ({
       ...prev,
