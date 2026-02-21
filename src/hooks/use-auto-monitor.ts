@@ -6,7 +6,7 @@
 import { useRef, useCallback, useEffect, useState } from 'react';
 
 export interface AutoMonitorConfig {
-  intervalMs: number;        // Intervalo entre capturas (padrão: 2000ms)
+  intervalMs: number;
   onDetect: (cards: {
     heroCards: string[];
     board: string[];
@@ -31,6 +31,19 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const lastFrameRef = useRef<string>('');
   const lastCardsRef = useRef<string>('');
+  const framesAnalyzedRef = useRef<number>(0);
+  
+  // Usar refs para callbacks para evitar re-renders
+  const onDetectRef = useRef(config.onDetect);
+  const onChangeRef = useRef(config.onChange);
+  const intervalMsRef = useRef(config.intervalMs);
+  
+  // Atualizar refs quando config mudar
+  useEffect(() => {
+    onDetectRef.current = config.onDetect;
+    onChangeRef.current = config.onChange;
+    intervalMsRef.current = config.intervalMs;
+  }, [config]);
   
   const [state, setState] = useState<MonitorState>({
     isMonitoring: false,
@@ -42,12 +55,18 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
 
   // Capturar frame atual
   const captureFrame = useCallback((): string | null => {
-    if (!videoRef.current || !canvasRef.current) return null;
+    if (!videoRef.current || !canvasRef.current) {
+      console.log('⚠️ Video ou Canvas não disponível');
+      return null;
+    }
     
     const video = videoRef.current;
     const canvas = canvasRef.current;
     
-    if (video.videoWidth === 0 || video.videoHeight === 0) return null;
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      console.log('⚠️ Video dimensions: ', video.videoWidth, 'x', video.videoHeight);
+      return null;
+    }
     
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
@@ -56,31 +75,13 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
     if (!ctx) return null;
     
     ctx.drawImage(video, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.7); // JPEG para menor tamanho
-  }, []);
-
-  // Detectar se houve mudança significativa na tela
-  const hasSignificantChange = useCallback((newFrame: string): boolean => {
-    if (!lastFrameRef.current) {
-      lastFrameRef.current = newFrame;
-      return true;
-    }
-    
-    // Comparação simples: se o tamanho mudou muito, houve mudança
-    const sizeDiff = Math.abs(newFrame.length - lastFrameRef.current.length);
-    const threshold = lastFrameRef.current.length * 0.05; // 5% de mudança
-    
-    if (sizeDiff > threshold) {
-      lastFrameRef.current = newFrame;
-      return true;
-    }
-    
-    return false;
+    return canvas.toDataURL('image/jpeg', 0.7);
   }, []);
 
   // Analisar frame para detectar cartas
   const analyzeFrame = useCallback(async (imageData: string) => {
     try {
+      console.log('🔍 Analisando frame...');
       const response = await fetch('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -88,6 +89,7 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       });
       
       const data = await response.json();
+      console.log('📊 Resultado:', data.success, data.gameState?.heroCards);
       
       if (data.success && data.gameState?.heroCards?.length >= 2) {
         const newCards = data.gameState.heroCards.join(',') + '|' + data.gameState.board.join(',');
@@ -102,7 +104,7 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
             lastCards: data.gameState.heroCards
           }));
           
-          config.onDetect({
+          onDetectRef.current({
             heroCards: data.gameState.heroCards,
             board: data.gameState.board || [],
             potSize: data.gameState.potSize || 0,
@@ -115,40 +117,42 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       
       return false;
     } catch (error) {
-      console.error('Frame analysis error:', error);
+      console.error('❌ Frame analysis error:', error);
       return false;
     }
-  }, [config]);
+  }, []);
 
-  // Loop de monitoramento
+  // Loop de monitoramento - sem dependências problemáticas
   const monitorLoop = useCallback(async () => {
     const frame = captureFrame();
     
     if (!frame) return;
     
+    framesAnalyzedRef.current += 1;
+    
     setState(prev => ({
       ...prev,
-      framesAnalyzed: prev.framesAnalyzed + 1,
+      framesAnalyzed: framesAnalyzedRef.current,
       lastCapture: new Date()
     }));
     
-    config.onChange({
+    onChangeRef.current({
       isMonitoring: true,
       lastCapture: new Date(),
-      framesAnalyzed: state.framesAnalyzed + 1,
+      framesAnalyzed: framesAnalyzedRef.current,
       cardsDetected: state.cardsDetected,
       lastCards: state.lastCards
     });
     
-    // Verificar se houve mudança
-    if (hasSignificantChange(frame)) {
-      console.log('🔄 Mudança detectada, analisando...');
-      await analyzeFrame(frame);
-    }
-  }, [captureFrame, hasSignificantChange, analyzeFrame, config, state]);
+    // Sempre analisar (removido hasSignificantChange que estava causando problemas)
+    console.log('🔄 Analisando frame...', framesAnalyzedRef.current);
+    await analyzeFrame(frame);
+  }, [captureFrame, analyzeFrame, state]);
 
-  // Parar monitoramento (declarado antes de startMonitoring para evitar erro de referência)
+  // Parar monitoramento
   const stopMonitoring = useCallback(() => {
+    console.log('⏹️ Parando monitoramento...');
+    
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -163,24 +167,29 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
     canvasRef.current = null;
     lastFrameRef.current = '';
     lastCardsRef.current = '';
+    framesAnalyzedRef.current = 0;
     
-    setState(prev => ({
-      ...prev,
-      isMonitoring: false,
-      cardsDetected: false
-    }));
-    
-    config.onChange({
+    setState({
       isMonitoring: false,
       lastCapture: null,
       framesAnalyzed: 0,
       cardsDetected: false,
       lastCards: []
     });
-  }, [config]);
+    
+    onChangeRef.current({
+      isMonitoring: false,
+      lastCapture: null,
+      framesAnalyzed: 0,
+      cardsDetected: false,
+      lastCards: []
+    });
+  }, []);
 
   // Iniciar monitoramento
   const startMonitoring = useCallback(async () => {
+    console.log('▶️ Iniciando monitoramento...');
+    
     try {
       // Solicitar acesso à tela
       const stream = await navigator.mediaDevices.getDisplayMedia({
@@ -192,26 +201,40 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
         audio: false
       });
       
+      console.log('✅ Stream obtido:', stream.getTracks()[0].label);
       streamRef.current = stream;
       
       // Criar elementos de vídeo e canvas
       const video = document.createElement('video');
       video.srcObject = stream;
-      video.play();
+      video.muted = true;
+      video.playsInline = true;
+      
       videoRef.current = video;
       
       const canvas = document.createElement('canvas');
       canvasRef.current = canvas;
       
-      // Configurar estado
-      setState(prev => ({
-        ...prev,
-        isMonitoring: true,
-        framesAnalyzed: 0,
-        cardsDetected: false
-      }));
+      // Aguardar vídeo estar pronto
+      await new Promise<void>((resolve) => {
+        video.onloadedmetadata = () => {
+          console.log('📹 Metadata carregada');
+          video.play().then(() => {
+            console.log('📹 Video playing');
+            resolve();
+          }).catch(err => {
+            console.error('❌ Error playing video:', err);
+            resolve();
+          });
+        };
+        video.onerror = (e) => {
+          console.error('❌ Video error:', e);
+          resolve();
+        };
+      });
       
-      config.onChange({
+      // Configurar estado
+      setState({
         isMonitoring: true,
         lastCapture: null,
         framesAnalyzed: 0,
@@ -219,27 +242,47 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
         lastCards: []
       });
       
-      // Aguardar vídeo estar pronto
-      await new Promise(resolve => {
-        video.onloadedmetadata = resolve;
+      onChangeRef.current({
+        isMonitoring: true,
+        lastCapture: null,
+        framesAnalyzed: 0,
+        cardsDetected: false,
+        lastCards: []
       });
       
       // Iniciar loop de captura
-      intervalRef.current = setInterval(monitorLoop, config.intervalMs);
+      const interval = intervalMsRef.current;
+      console.log('⏱️ Iniciando loop com intervalo de', interval, 'ms');
       
-      // Captura inicial
-      setTimeout(() => monitorLoop(), 500);
+      intervalRef.current = setInterval(() => {
+        monitorLoop();
+      }, interval);
+      
+      // Captura inicial após 1 segundo
+      setTimeout(() => {
+        console.log('🚀 Captura inicial...');
+        monitorLoop();
+      }, 1000);
       
       // Handler para quando o usuário para de compartilhar
       stream.getVideoTracks()[0].onended = () => {
+        console.log('🛑 Stream encerrado pelo usuário');
         stopMonitoring();
       };
       
     } catch (error: any) {
-      console.error('Error starting monitor:', error);
-      setState(prev => ({ ...prev, isMonitoring: false }));
+      console.error('❌ Error starting monitor:', error);
+      console.error('❌ Error name:', error.name);
+      console.error('❌ Error message:', error.message);
+      setState({
+        isMonitoring: false,
+        lastCapture: null,
+        framesAnalyzed: 0,
+        cardsDetected: false,
+        lastCards: []
+      });
     }
-  }, [config, monitorLoop, stopMonitoring]);
+  }, [monitorLoop, stopMonitoring]);
 
   // Cleanup
   useEffect(() => {
