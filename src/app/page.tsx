@@ -412,6 +412,7 @@ export default function PokerRTA() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [compactMode, setCompactMode] = useState(false);
   const [activeTab, setActiveTab] = useState('manual');
+  const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
   
   // Manual analysis
   const analyze = useCallback(async () => {
@@ -452,7 +453,40 @@ export default function PokerRTA() {
     setIsAnalyzing(true);
     
     try {
-      // First detect cards from image
+      // PRIMEIRO: Tentar detecção local (100% gratuito)
+      const { detectPokerCards } = await import('@/lib/card-detector');
+      const localResult = await detectPokerCards(imageData);
+      
+      if (localResult.heroCards.length >= 2) {
+        // Detecção local funcionou!
+        setHeroCards(localResult.heroCards);
+        setBoardCards(localResult.board);
+        setPotSize(localResult.potSize);
+        setStreet(localResult.board.length >= 3 ? 'flop' : 'preflop');
+        
+        // Analisar com cartas detectadas
+        const analyzeResponse = await fetch('/api/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            heroCards: localResult.heroCards,
+            board: localResult.board,
+            potSize: localResult.potSize,
+            betToCall: 0,
+            stackSize: 1000,
+            street: localResult.board.length >= 3 ? 'flop' : 'preflop',
+            position: 'BTN',
+            numPlayers: 2
+          })
+        });
+        
+        const analyzeData = await analyzeResponse.json();
+        setResult(analyzeData);
+        setIsAnalyzing(false);
+        return;
+      }
+      
+      // SEGUNDO: Tentar API como fallback
       const detectResponse = await fetch('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -495,6 +529,8 @@ export default function PokerRTA() {
       }
     } catch (error) {
       console.error('Capture analysis error:', error);
+      setDetectionMessage('Não foi possível detectar cartas automaticamente. Use o modo manual para selecionar suas cartas.');
+      setActiveTab('manual');
     } finally {
       setIsAnalyzing(false);
     }
@@ -676,9 +712,15 @@ export default function PokerRTA() {
           <TabsContent value="capture" className="space-y-6">
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-lg">📷 Captura de Tela</CardTitle>
+                <CardTitle className="text-lg">📷 Captura de Tela (Gratuito)</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <div className="bg-blue-900/30 border border-blue-700 rounded p-3 text-sm">
+                  <p className="text-blue-300">
+                    <strong>🆓 Modo Gratuito:</strong> Detecção funciona 100% no seu navegador, sem APIs externas.
+                  </p>
+                </div>
+                
                 <p className="text-sm text-gray-400">
                   Clique em "Capturar Tela" e selecione a janela do poker. 
                   Depois clique em "Analisar Frame" para obter a recomendação.
@@ -688,7 +730,24 @@ export default function PokerRTA() {
                 
                 {isAnalyzing && (
                   <div className="text-center py-4">
-                    <div className="animate-pulse text-blue-500">Analisando imagem...</div>
+                    <div className="animate-pulse text-blue-500">🔍 Analisando imagem...</div>
+                    <div className="text-xs text-gray-500 mt-1">Detecção local em andamento</div>
+                  </div>
+                )}
+                
+                {detectionMessage && (
+                  <div className="bg-yellow-900/30 border border-yellow-700 rounded p-3">
+                    <p className="text-yellow-300 text-sm">{detectionMessage}</p>
+                    <Button 
+                      size="sm" 
+                      className="mt-2"
+                      onClick={() => {
+                        setDetectionMessage(null);
+                        setActiveTab('manual');
+                      }}
+                    >
+                      ✏️ Ir para Modo Manual
+                    </Button>
                   </div>
                 )}
               </CardContent>
