@@ -64,6 +64,14 @@ interface AnalysisResult {
   insights: string[];
 }
 
+// Histórico de análises por street
+interface StreetHistory {
+  street: 'preflop' | 'flop' | 'turn' | 'river';
+  board: string[];
+  result: AnalysisResult;
+  timestamp: number;
+}
+
 // ==================== COMPONENTES ====================
 
 function CardSelector({ 
@@ -414,10 +422,13 @@ export default function PokerRTA() {
   const [activeTab, setActiveTab] = useState('manual');
   const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
   
+  // Histórico de análises por street
+  const [handHistory, setHandHistory] = useState<StreetHistory[]>([]);
+  const [viewingHistoryStreet, setViewingHistoryStreet] = useState<string | null>(null);
+  
   // Manual analysis
   const analyze = useCallback(async () => {
     if (heroCards.length < 2) {
-      alert('Selecione pelo menos 2 cartas');
       return;
     }
     
@@ -441,6 +452,21 @@ export default function PokerRTA() {
       
       const data = await response.json();
       setResult(data);
+      
+      // Salvar no histórico por street
+      setHandHistory(prev => {
+        const newHistory = prev.filter(h => h.street !== street);
+        newHistory.push({
+          street,
+          board: [...boardCards],
+          result: data,
+          timestamp: Date.now()
+        });
+        return newHistory.sort((a, b) => {
+          const order = { preflop: 0, flop: 1, turn: 2, river: 3 };
+          return order[a.street] - order[b.street];
+        });
+      });
     } catch (error) {
       console.error('Analysis error:', error);
     } finally {
@@ -505,13 +531,41 @@ export default function PokerRTA() {
     }
   }, []);
   
-  // Auto-analyze when cards change
+  // Auto-analyze when cards or game state change
   useEffect(() => {
     if (heroCards.length >= 2 && activeTab === 'manual') {
-      const timer = setTimeout(analyze, 500);
+      const timer = setTimeout(analyze, 300);
       return () => clearTimeout(timer);
     }
-  }, [heroCards, boardCards, potSize, betToCall, street]);
+  }, [heroCards, boardCards, potSize, betToCall, street, stackSize, position, numPlayers]);
+  
+  // Visualizar histórico de uma street específica
+  const viewHistoryStreet = (streetName: 'preflop' | 'flop' | 'turn' | 'river') => {
+    const historyEntry = handHistory.find(h => h.street === streetName);
+    if (historyEntry) {
+      setResult(historyEntry.result);
+      setViewingHistoryStreet(streetName);
+    }
+  };
+  
+  // Limpar histórico e começar nova mão
+  const newHand = () => {
+    setHandHistory([]);
+    setHeroCards([]);
+    setBoardCards([]);
+    setPotSize(0);
+    setBetToCall(0);
+    setResult(null);
+    setViewingHistoryStreet(null);
+    setStreet('preflop');
+  };
+  
+  // Avançar para próxima street (preservando dados)
+  const advanceStreet = () => {
+    if (street === 'preflop') setStreet('flop');
+    else if (street === 'flop') setStreet('turn');
+    else if (street === 'turn') setStreet('river');
+  };
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
@@ -527,6 +581,39 @@ export default function PokerRTA() {
           </div>
           
           <div className="flex items-center gap-3">
+            {/* Histórico de Streets */}
+            {handHistory.length > 0 && (
+              <div className="flex items-center gap-1 mr-4">
+                <span className="text-xs text-gray-500 mr-2">Histórico:</span>
+                {['preflop', 'flop', 'turn', 'river'].map(s => {
+                  const hasHistory = handHistory.some(h => h.street === s);
+                  const isCurrent = street === s && !viewingHistoryStreet;
+                  const isViewing = viewingHistoryStreet === s;
+                  return (
+                    <Button
+                      key={s}
+                      size="sm"
+                      variant={isCurrent ? "default" : isViewing ? "secondary" : "ghost"}
+                      className={`text-xs px-2 py-1 h-6 ${!hasHistory ? 'opacity-30' : ''}`}
+                      disabled={!hasHistory}
+                      onClick={() => viewHistoryStreet(s as any)}
+                    >
+                      {s === 'preflop' ? 'PF' : s.charAt(0).toUpperCase()}
+                    </Button>
+                  );
+                })}
+              </div>
+            )}
+            
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={newHand}
+              className="gap-1 text-red-400 border-red-800 hover:bg-red-900/30"
+            >
+              🔄 Nova Mão
+            </Button>
+            
             <InstallButton />
             <Button
               variant={compactMode ? "default" : "outline"}
@@ -645,17 +732,39 @@ export default function PokerRTA() {
                     <Separator className="my-4" />
                     
                     <div className="flex flex-wrap gap-2">
-                      {['preflop', 'flop', 'turn', 'river'].map(s => (
-                        <Button
-                          key={s}
-                          size="sm"
-                          variant={street === s ? "default" : "outline"}
-                          onClick={() => setStreet(s as any)}
-                        >
-                          {s.charAt(0).toUpperCase() + s.slice(1)}
-                        </Button>
-                      ))}
+                      {['preflop', 'flop', 'turn', 'river'].map(s => {
+                        const hasHistory = handHistory.some(h => h.street === s);
+                        return (
+                          <Button
+                            key={s}
+                            size="sm"
+                            variant={street === s ? "default" : "outline"}
+                            onClick={() => {
+                              setStreet(s as any);
+                              setViewingHistoryStreet(null);
+                            }}
+                            className="relative"
+                          >
+                            {s.charAt(0).toUpperCase() + s.slice(1)}
+                            {hasHistory && (
+                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                            )}
+                          </Button>
+                        );
+                      })}
                     </div>
+                    
+                    {/* Botão para avançar street */}
+                    {street !== 'river' && heroCards.length >= 2 && (
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        onClick={advanceStreet}
+                        className="mt-2 w-full"
+                      >
+                        ➡️ Próxima Street ({street === 'preflop' ? 'Flop' : street === 'flop' ? 'Turn' : 'River'})
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               </div>
