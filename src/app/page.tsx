@@ -65,7 +65,6 @@ interface AnalysisResult {
   insights: string[];
 }
 
-// Histórico de análises por street
 interface StreetHistory {
   street: 'preflop' | 'flop' | 'turn' | 'river';
   board: string[];
@@ -73,8 +72,43 @@ interface StreetHistory {
   timestamp: number;
 }
 
-// ==================== COMPONENTES ====================
+// ==================== COMPONENTES VISUAIS MELHORADOS ====================
 
+// Carta estilo baralho - grande e visível
+function CardBadge({ card, onRemove }: { card: string; onRemove?: () => void }) {
+  const rank = card[0];
+  const suit = card[1].toLowerCase();
+  const isRed = suit === 'h' || suit === 'd';
+  
+  return (
+    <div 
+      className={`
+        relative inline-flex items-center justify-center
+        min-w-[56px] h-[76px] 
+        bg-white rounded-xl shadow-xl
+        border-2 border-gray-300
+        font-bold
+        ${isRed ? 'text-red-600' : 'text-gray-900'}
+        transition-transform hover:scale-105
+      `}
+    >
+      <div className="flex flex-col items-center leading-none">
+        <span className="text-2xl font-black">{rank}</span>
+        <span className="text-2xl">{SUIT_SYMBOLS[suit]}</span>
+      </div>
+      {onRemove && (
+        <button
+          onClick={onRemove}
+          className="absolute -top-2 -right-2 w-7 h-7 bg-red-500 text-white rounded-full text-lg font-bold hover:bg-red-600 shadow-lg flex items-center justify-center border-2 border-white"
+        >
+          ×
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Seletor de cartas melhorado
 function CardSelector({ 
   label, 
   cards, 
@@ -99,70 +133,61 @@ function CardSelector({
   };
   
   return (
-    <div className="space-y-2">
-      <Label className="text-sm font-medium text-gray-300">{label}</Label>
+    <div className="space-y-4">
+      <Label className="text-lg font-bold text-white">{label}</Label>
       
-      <div className="flex flex-wrap gap-2 mb-2">
-        {cards.map((card, i) => {
-          const rank = card[0];
-          const suit = card[1].toLowerCase();
-          const color = SUIT_COLORS[suit];
-          
-          return (
-            <div
-              key={i}
-              className="flex items-center bg-gray-800 rounded px-2 py-1 text-sm"
-              style={{ color }}
-            >
-              <span className="font-bold">{rank}</span>
-              <span>{SUIT_SYMBOLS[suit]}</span>
-              <button
-                onClick={() => removeCard(i)}
-                className="ml-2 text-gray-500 hover:text-red-500"
-              >
-                ×
-              </button>
-            </div>
-          );
-        })}
-      </div>
+      {/* Cartas selecionadas */}
+      {cards.length > 0 && (
+        <div className="flex flex-wrap gap-3 p-4 bg-gray-800/50 rounded-2xl border-2 border-gray-600">
+          {cards.map((card, i) => (
+            <CardBadge key={i} card={card} onRemove={() => removeCard(i)} />
+          ))}
+        </div>
+      )}
       
-      <div className="flex gap-2">
+      {/* Seletor */}
+      <div className="flex gap-3 items-center flex-wrap">
         <select
           value={selectedRank}
           onChange={(e) => setSelectedRank(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+          className="bg-gray-700 border-2 border-gray-500 rounded-xl px-5 py-3 text-xl font-bold text-white focus:border-blue-400 focus:outline-none cursor-pointer"
         >
           {RANKS.map(r => (
-            <option key={r} value={r}>{r}</option>
+            <option key={r} value={r} className="bg-gray-800 text-xl">{r}</option>
           ))}
         </select>
         
         <select
           value={selectedSuit}
           onChange={(e) => setSelectedSuit(e.target.value)}
-          className="bg-gray-800 border border-gray-700 rounded px-2 py-1 text-sm"
+          className="bg-gray-700 border-2 border-gray-500 rounded-xl px-5 py-3 text-xl font-bold text-white focus:border-blue-400 focus:outline-none cursor-pointer"
         >
           {SUITS.map(s => (
-            <option key={s} value={s} style={{ color: SUIT_COLORS[s] }}>
+            <option key={s} value={s} className="bg-gray-800 text-xl">
               {SUIT_SYMBOLS[s]} {s.toUpperCase()}
             </option>
           ))}
         </select>
         
-        <Button size="sm" onClick={addCard} variant="secondary">
-          +
+        <Button 
+          size="lg" 
+          onClick={addCard} 
+          className="bg-blue-600 hover:bg-blue-500 text-xl px-6 py-6 font-bold rounded-xl shadow-lg"
+        >
+          + Adicionar
         </Button>
       </div>
     </div>
   );
 }
 
+// Display de recomendação melhorado
 function RecommendationDisplay({ result }: { result: AnalysisResult | null }) {
   if (!result) {
     return (
-      <div className="text-center py-8 text-gray-500">
-        Configure as cartas e clique em "Analisar" para ver a recomendação
+      <div className="text-center py-16 bg-gray-800/30 rounded-2xl border-2 border-gray-700">
+        <div className="text-7xl mb-4">🃏</div>
+        <p className="text-xl text-gray-400 font-medium">Selecione suas cartas para ver a recomendação</p>
       </div>
     );
   }
@@ -170,50 +195,85 @@ function RecommendationDisplay({ result }: { result: AnalysisResult | null }) {
   const { state, analysis, recommendation, insights } = result;
   
   return (
-    <div className="space-y-4">
-      {/* Quick Action */}
+    <div className="space-y-5">
+      {/* Cartas atuais */}
+      <div className="flex items-center justify-center gap-6 py-6 bg-gray-800/40 rounded-2xl border border-gray-700">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-sm text-gray-400 uppercase tracking-wider font-medium">Suas Cartas</span>
+          <div className="flex gap-2">
+            {state.heroCards.map((card, i) => (
+              <CardBadge key={i} card={`${card.rank}${card.suit}`} />
+            ))}
+          </div>
+        </div>
+        
+        {state.board.length > 0 && (
+          <>
+            <div className="w-px h-20 bg-gray-600" />
+            <div className="flex flex-col items-center gap-2">
+              <span className="text-sm text-gray-400 uppercase tracking-wider font-medium">Board</span>
+              <div className="flex gap-2">
+                {state.board.map((card, i) => (
+                  <CardBadge key={i} card={`${card.rank}${card.suit}`} />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+      
+      {/* Ação Recomendada - GRANDE E DESTACADO */}
       <div 
-        className="text-center py-6 rounded-lg"
-        style={{ backgroundColor: recommendation.actionColor + '20' }}
+        className="text-center py-10 rounded-2xl border-4 shadow-2xl"
+        style={{ 
+          backgroundColor: recommendation.actionColor + '20',
+          borderColor: recommendation.actionColor
+        }}
       >
         <div 
-          className="text-4xl font-black mb-2"
+          className="text-7xl font-black mb-3 tracking-tight"
           style={{ color: recommendation.actionColor }}
         >
           {recommendation.quickAction}
         </div>
         {recommendation.amount > 0 && (
-          <div className="text-xl font-bold text-white">
-            ${recommendation.amount}
-          </div>
+          <div className="text-4xl font-bold text-white">${recommendation.amount}</div>
         )}
-        <div className="text-sm text-gray-400 mt-2">
-          Confiança: {recommendation.confidence}
+        <div className="mt-4 inline-flex items-center gap-3 px-6 py-2 bg-black/40 rounded-full">
+          <span className="text-gray-300 font-medium">Confiança:</span>
+          <span className="font-bold text-white text-lg">{recommendation.confidence}</span>
         </div>
       </div>
       
-      {/* Reasoning */}
-      <div className="bg-gray-800/50 rounded p-3">
-        <p className="text-sm text-gray-300">{recommendation.reasoning}</p>
+      {/* Análise textual */}
+      <div className="bg-gray-800/70 rounded-2xl p-5 border border-gray-700">
+        <div className="text-sm text-gray-400 uppercase tracking-wider mb-3 font-medium">Análise Detalhada</div>
+        <p className="text-lg text-gray-200 leading-relaxed">{recommendation.reasoning}</p>
       </div>
       
-      {/* Analysis Metrics */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-gray-800/50 rounded p-3">
-          <div className="text-xs text-gray-500">Pot Odds</div>
-          <div className="text-lg font-bold text-white">{analysis.potOdds}</div>
+      {/* Métricas - Cards grandes */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 border-2 border-gray-700 shadow-lg">
+          <div className="text-base text-gray-400 mb-2">Pot Odds</div>
+          <div className="text-3xl font-bold text-white">{analysis.potOdds}</div>
         </div>
-        <div className="bg-gray-800/50 rounded p-3">
-          <div className="text-xs text-gray-500">Equity</div>
-          <div className="text-lg font-bold text-white">{analysis.equity}</div>
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 border-2 border-gray-700 shadow-lg">
+          <div className="text-base text-gray-400 mb-2">Equity</div>
+          <div className="text-3xl font-bold text-white">{analysis.equity}</div>
         </div>
-        <div className="bg-gray-800/50 rounded p-3">
-          <div className="text-xs text-gray-500">Outs</div>
-          <div className="text-lg font-bold text-white">{analysis.outs}</div>
+        <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-5 border-2 border-gray-700 shadow-lg">
+          <div className="text-base text-gray-400 mb-2">Outs</div>
+          <div className="text-3xl font-bold text-white">{analysis.outs}</div>
         </div>
-        <div className="bg-gray-800/50 rounded p-3">
-          <div className="text-xs text-gray-500">EV</div>
-          <div className={`text-lg font-bold ${analysis.ev.startsWith('+') ? 'text-green-500' : 'text-red-500'}`}>
+        <div className={`rounded-2xl p-5 border-2 shadow-lg ${
+          analysis.ev.startsWith('+') 
+            ? 'bg-gradient-to-br from-green-900/60 to-green-800/40 border-green-500' 
+            : 'bg-gradient-to-br from-red-900/60 to-red-800/40 border-red-500'
+        }`}>
+          <div className={`text-base mb-2 ${analysis.ev.startsWith('+') ? 'text-green-300' : 'text-red-300'}`}>
+            Expected Value
+          </div>
+          <div className={`text-3xl font-bold ${analysis.ev.startsWith('+') ? 'text-green-400' : 'text-red-400'}`}>
             {analysis.ev}
           </div>
         </div>
@@ -221,10 +281,10 @@ function RecommendationDisplay({ result }: { result: AnalysisResult | null }) {
       
       {/* Insights */}
       {insights.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs text-gray-500 uppercase">Insights</div>
+        <div className="space-y-3">
+          <div className="text-base text-gray-400 uppercase tracking-wider font-medium">💡 Insights</div>
           {insights.map((insight, i) => (
-            <div key={i} className="text-sm text-gray-400 bg-gray-800/30 rounded px-3 py-2">
+            <div key={i} className="text-lg text-gray-300 bg-gray-800/40 rounded-2xl px-5 py-4 border border-gray-700">
               {insight}
             </div>
           ))}
@@ -234,6 +294,7 @@ function RecommendationDisplay({ result }: { result: AnalysisResult | null }) {
   );
 }
 
+// Captura de tela
 function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -290,18 +351,18 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   };
   
   return (
-    <div className="space-y-3">
-      <div className="flex gap-2">
+    <div className="space-y-4">
+      <div className="flex gap-3">
         {!isStreaming ? (
-          <Button onClick={startCapture} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={startCapture} className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl">
             📷 Capturar Tela
           </Button>
         ) : (
           <>
-            <Button onClick={captureFrame} className="bg-green-600 hover:bg-green-700">
+            <Button onClick={captureFrame} className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl">
               🎯 Analisar Frame
             </Button>
-            <Button onClick={stopCapture} variant="destructive">
+            <Button onClick={stopCapture} variant="destructive" className="text-lg py-6 px-8 font-bold rounded-xl">
               Parar
             </Button>
           </>
@@ -309,12 +370,12 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       </div>
       
       {isStreaming && (
-        <div className="relative rounded overflow-hidden bg-black">
+        <div className="relative rounded-xl overflow-hidden bg-black border-2 border-gray-600">
           <video
             ref={videoRef}
             autoPlay
             playsInline
-            className="w-full h-auto max-h-40 object-contain"
+            className="w-full h-auto max-h-48 object-contain"
           />
         </div>
       )}
@@ -324,6 +385,7 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   );
 }
 
+// Modo compacto
 function CompactMode({ result }: { result: AnalysisResult | null }) {
   if (!result) return null;
   
@@ -331,32 +393,34 @@ function CompactMode({ result }: { result: AnalysisResult | null }) {
   
   return (
     <div 
-      className="fixed bottom-4 right-4 p-4 rounded-lg shadow-2xl z-50 min-w-[200px]"
-      style={{ backgroundColor: 'rgba(0,0,0,0.95)' }}
+      className="fixed bottom-6 right-6 p-6 rounded-2xl shadow-2xl z-50 min-w-[240px] border-2"
+      style={{ 
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        borderColor: recommendation.actionColor
+      }}
     >
       <div 
-        className="text-2xl font-black text-center"
+        className="text-4xl font-black text-center"
         style={{ color: recommendation.actionColor }}
       >
         {recommendation.quickAction}
       </div>
       {recommendation.amount > 0 && (
-        <div className="text-center text-white font-bold">
+        <div className="text-center text-2xl text-white font-bold mt-1">
           ${recommendation.amount}
         </div>
       )}
-      <div className="text-xs text-gray-500 text-center mt-1">
+      <div className="text-sm text-gray-400 text-center mt-2">
         {recommendation.confidence} confiança
       </div>
     </div>
   );
 }
 
-// PWA Install Button Component
+// PWA Install
 function InstallButton() {
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstalled, setIsInstalled] = useState(() => {
-    // Initialize based on whether already running as installed app
     if (typeof window !== 'undefined') {
       return window.matchMedia('(display-mode: standalone)').matches;
     }
@@ -370,13 +434,11 @@ function InstallButton() {
     };
 
     window.addEventListener('beforeinstallprompt', handler);
-
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
   const handleInstall = async () => {
     if (!deferredPrompt) {
-      // Fallback: show instructions
       alert('Para instalar:\n\nNo Chrome/Edge: Menu → "Instalar app"\nNo Safari iOS: Compartilhar → "Adicionar à Tela de Início"');
       return;
     }
@@ -397,15 +459,14 @@ function InstallButton() {
       variant="outline"
       size="sm"
       onClick={handleInstall}
-      className="gap-2"
+      className="gap-2 text-base px-4 py-2"
     >
-      📥 Instalar App
+      📥 Instalar
     </Button>
   );
 }
 
-// ==================== COMPONENTE DE MONITORAMENTO AUTOMÁTICO ====================
-
+// Overlay de Monitoramento Automático
 interface AutoMonitorOverlayProps {
   result: AnalysisResult | null;
   monitorState: {
@@ -420,28 +481,28 @@ function AutoMonitorOverlay({ result, monitorState, onStop }: AutoMonitorOverlay
   if (!monitorState.isMonitoring) return null;
   
   return (
-    <div className="fixed top-4 left-4 z-50">
-      <Card className="bg-black/95 border-gray-700 shadow-2xl min-w-[280px]">
-        <CardHeader className="py-3 px-4">
+    <div className="fixed top-6 left-6 z-50">
+      <Card className="bg-black/95 border-2 border-green-500 shadow-2xl min-w-[320px] rounded-2xl">
+        <CardHeader className="py-4 px-5">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-sm font-medium text-green-400">Monitorando</span>
+            <div className="flex items-center gap-3">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
+              <span className="text-lg font-bold text-green-400">Monitorando</span>
             </div>
-            <Button size="sm" variant="ghost" onClick={onStop} className="h-6 px-2 text-xs">
+            <Button size="sm" variant="ghost" onClick={onStop} className="h-8 px-3 text-sm font-medium">
               Parar
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="py-3 px-4">
+        <CardContent className="py-4 px-5">
           {result ? (
-            <div className="space-y-3">
+            <div className="space-y-4">
               {/* Cards */}
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Cartas:</span>
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-gray-400 font-medium">Cartas:</span>
                 <div className="flex gap-1">
                   {result.state.heroCards.map((card, i) => (
-                    <span key={i} style={{ color: card.color }} className="font-bold">
+                    <span key={i} style={{ color: card.color }} className="text-xl font-bold">
                       {card.display}
                     </span>
                   ))}
@@ -450,11 +511,11 @@ function AutoMonitorOverlay({ result, monitorState, onStop }: AutoMonitorOverlay
               
               {/* Board */}
               {result.state.board.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500">Board:</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-gray-400 font-medium">Board:</span>
                   <div className="flex gap-1">
                     {result.state.board.map((card, i) => (
-                      <span key={i} style={{ color: card.color }} className="font-bold">
+                      <span key={i} style={{ color: card.color }} className="text-xl font-bold">
                         {card.display}
                       </span>
                     ))}
@@ -464,32 +525,35 @@ function AutoMonitorOverlay({ result, monitorState, onStop }: AutoMonitorOverlay
               
               {/* Recomendação Principal */}
               <div 
-                className="text-center py-3 rounded-lg"
-                style={{ backgroundColor: result.recommendation.actionColor + '20' }}
+                className="text-center py-4 rounded-xl border-2"
+                style={{ 
+                  backgroundColor: result.recommendation.actionColor + '20',
+                  borderColor: result.recommendation.actionColor
+                }}
               >
                 <div 
-                  className="text-3xl font-black"
+                  className="text-4xl font-black"
                   style={{ color: result.recommendation.actionColor }}
                 >
                   {result.recommendation.quickAction}
                 </div>
                 {result.recommendation.amount > 0 && (
-                  <div className="text-lg font-bold text-white">${result.recommendation.amount}</div>
+                  <div className="text-xl font-bold text-white">${result.recommendation.amount}</div>
                 )}
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-sm text-gray-300 mt-2 font-medium">
                   {result.recommendation.confidence} | EV: {result.analysis.ev}
                 </div>
               </div>
               
               {/* Reasoning */}
-              <div className="text-xs text-gray-400 bg-gray-800/50 rounded p-2">
+              <div className="text-sm text-gray-300 bg-gray-800/50 rounded-xl p-3 border border-gray-700">
                 {result.recommendation.reasoning}
               </div>
             </div>
           ) : (
-            <div className="text-center py-4 text-gray-500 text-sm">
+            <div className="text-center py-6 text-gray-400 text-base font-medium">
               Aguardando detecção de cartas...
-              <div className="text-xs mt-2">
+              <div className="text-sm mt-3 text-gray-500">
                 {monitorState.framesAnalyzed} frames analisados
               </div>
             </div>
@@ -519,36 +583,30 @@ export default function PokerRTA() {
   const [activeTab, setActiveTab] = useState('auto');
   const [detectionMessage, setDetectionMessage] = useState<string | null>(null);
   
-  // Histórico de análises por street
   const [handHistory, setHandHistory] = useState<StreetHistory[]>([]);
   const [viewingHistoryStreet, setViewingHistoryStreet] = useState<string | null>(null);
   
-  // Estado do monitoramento automático
   const [monitorState, setMonitorState] = useState({
     isMonitoring: false,
     framesAnalyzed: 0,
     lastCapture: null as Date | null
   });
   
-  // Hook de monitoramento automático
   const autoMonitor = useAutoMonitor({
-    intervalMs: 2500, // Analisa a cada 2.5 segundos
+    intervalMs: 2500,
     onDetect: async (detected) => {
-      console.log('🎯 Cartas detectadas automaticamente:', detected.heroCards, detected.board);
+      console.log('🎯 Cartas detectadas:', detected.heroCards, detected.board);
       
-      // Atualizar cartas
       setHeroCards(detected.heroCards);
       setBoardCards(detected.board);
       setPotSize(detected.potSize);
       
-      // Determinar street
       let newStreet: 'preflop' | 'flop' | 'turn' | 'river' = 'preflop';
       if (detected.board.length >= 3) newStreet = 'flop';
       if (detected.board.length >= 4) newStreet = 'turn';
       if (detected.board.length >= 5) newStreet = 'river';
       setStreet(newStreet);
       
-      // Analisar automaticamente
       try {
         const response = await fetch('/api/analyze', {
           method: 'POST',
@@ -568,7 +626,6 @@ export default function PokerRTA() {
         const data = await response.json();
         setResult(data);
         
-        // Salvar no histórico
         setHandHistory(prev => {
           const newHistory = prev.filter(h => h.street !== newStreet);
           newHistory.push({
@@ -595,11 +652,8 @@ export default function PokerRTA() {
     }
   });
   
-  // Manual analysis
   const analyze = useCallback(async () => {
-    if (heroCards.length < 2) {
-      return;
-    }
+    if (heroCards.length < 2) return;
     
     setIsAnalyzing(true);
     
@@ -622,7 +676,6 @@ export default function PokerRTA() {
       const data = await response.json();
       setResult(data);
       
-      // Salvar no histórico por street
       setHandHistory(prev => {
         const newHistory = prev.filter(h => h.street !== street);
         newHistory.push({
@@ -643,13 +696,11 @@ export default function PokerRTA() {
     }
   }, [heroCards, boardCards, potSize, betToCall, stackSize, street, position, numPlayers]);
   
-  // Screen capture analysis - 100% GRATUITO
   const handleCapture = useCallback(async (imageData: string) => {
     setIsAnalyzing(true);
     setDetectionMessage(null);
     
     try {
-      // Chamar API de detecção GRATUITA (sem API key necessário)
       const detectResponse = await fetch('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -659,7 +710,6 @@ export default function PokerRTA() {
       const detectData = await detectResponse.json();
       
       if (detectData.success && detectData.gameState?.heroCards?.length >= 2) {
-        // Detecção funcionou!
         const state = detectData.gameState;
         const usedApi = detectData.usedApi || 'local';
         
@@ -668,9 +718,8 @@ export default function PokerRTA() {
         setPotSize(state.potSize || 0);
         setStreet(state.street || 'preflop');
         
-        setDetectionMessage(`✅ Detectado via ${usedApi}: ${state.heroCards.join(', ')}${state.board?.length ? ' | Board: ' + state.board.join(', ') : ''}`);
+        setDetectionMessage(`✅ Detectado via ${Array.isArray(usedApi) ? usedApi.join(', ') : usedApi}: ${state.heroCards.join(', ')}${state.board?.length ? ' | Board: ' + state.board.join(', ') : ''}`);
         
-        // Analisar com cartas detectadas
         const analyzeResponse = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -689,7 +738,6 @@ export default function PokerRTA() {
         const analyzeData = await analyzeResponse.json();
         setResult(analyzeData);
       } else {
-        // Detecção falhou
         setDetectionMessage(detectData.message || 'Não foi possível detectar as cartas automaticamente.');
       }
     } catch (error) {
@@ -700,7 +748,6 @@ export default function PokerRTA() {
     }
   }, []);
   
-  // Auto-analyze when cards or game state change
   useEffect(() => {
     if (heroCards.length >= 2 && activeTab === 'manual') {
       const timer = setTimeout(analyze, 300);
@@ -708,7 +755,6 @@ export default function PokerRTA() {
     }
   }, [heroCards, boardCards, potSize, betToCall, street, stackSize, position, numPlayers]);
   
-  // Visualizar histórico de uma street específica
   const viewHistoryStreet = (streetName: 'preflop' | 'flop' | 'turn' | 'river') => {
     const historyEntry = handHistory.find(h => h.street === streetName);
     if (historyEntry) {
@@ -717,7 +763,6 @@ export default function PokerRTA() {
     }
   };
   
-  // Limpar histórico e começar nova mão
   const newHand = () => {
     setHandHistory([]);
     setHeroCards([]);
@@ -729,7 +774,6 @@ export default function PokerRTA() {
     setStreet('preflop');
   };
   
-  // Avançar para próxima street (preservando dados)
   const advanceStreet = () => {
     if (street === 'preflop') setStreet('flop');
     else if (street === 'flop') setStreet('turn');
@@ -738,7 +782,6 @@ export default function PokerRTA() {
   
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      {/* Overlay de Monitoramento Automático */}
       <AutoMonitorOverlay 
         result={result}
         monitorState={monitorState}
@@ -746,21 +789,20 @@ export default function PokerRTA() {
       />
       
       {/* Header */}
-      <header className="border-b border-gray-700 bg-black/50 backdrop-blur">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">🃏</span>
+      <header className="border-b-2 border-gray-700 bg-black/60 backdrop-blur">
+        <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <span className="text-4xl">🃏</span>
             <div>
-              <h1 className="text-xl font-bold">Poker RTA</h1>
-              <p className="text-xs text-gray-500">Real-Time Assistance</p>
+              <h1 className="text-2xl font-black">Poker RTA</h1>
+              <p className="text-sm text-gray-400">Real-Time Assistance</p>
             </div>
           </div>
           
           <div className="flex items-center gap-3">
-            {/* Histórico de Streets */}
             {handHistory.length > 0 && (
-              <div className="flex items-center gap-1 mr-4">
-                <span className="text-xs text-gray-500 mr-2">Histórico:</span>
+              <div className="flex items-center gap-2 mr-4">
+                <span className="text-sm text-gray-400 font-medium">Histórico:</span>
                 {['preflop', 'flop', 'turn', 'river'].map(s => {
                   const hasHistory = handHistory.some(h => h.street === s);
                   const isCurrent = street === s && !viewingHistoryStreet;
@@ -770,7 +812,7 @@ export default function PokerRTA() {
                       key={s}
                       size="sm"
                       variant={isCurrent ? "default" : isViewing ? "secondary" : "ghost"}
-                      className={`text-xs px-2 py-1 h-6 ${!hasHistory ? 'opacity-30' : ''}`}
+                      className={`text-sm px-3 py-1 h-8 font-bold ${!hasHistory ? 'opacity-30' : ''}`}
                       disabled={!hasHistory}
                       onClick={() => viewHistoryStreet(s as any)}
                     >
@@ -785,7 +827,7 @@ export default function PokerRTA() {
               variant="outline"
               size="sm"
               onClick={newHand}
-              className="gap-1 text-red-400 border-red-800 hover:bg-red-900/30"
+              className="gap-2 text-red-400 border-red-700 hover:bg-red-900/30 font-medium px-4"
             >
               🔄 Nova Mão
             </Button>
@@ -795,91 +837,89 @@ export default function PokerRTA() {
               variant={compactMode ? "default" : "outline"}
               size="sm"
               onClick={() => setCompactMode(!compactMode)}
+              className="font-medium px-4"
             >
-              {compactMode ? '🖥️ Modo Completo' : '📱 Modo Compacto'}
+              {compactMode ? '🖥️ Completo' : '📱 Compacto'}
             </Button>
           </div>
         </div>
       </header>
       
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6">
+      <main className="max-w-6xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3 mb-6">
-            <TabsTrigger value="auto">🤖 Modo Auto</TabsTrigger>
-            <TabsTrigger value="manual">✏️ Manual</TabsTrigger>
-            <TabsTrigger value="capture">📷 Captura</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 mb-8 h-14">
+            <TabsTrigger value="auto" className="text-lg font-bold">🤖 Modo Auto</TabsTrigger>
+            <TabsTrigger value="manual" className="text-lg font-bold">✏️ Manual</TabsTrigger>
+            <TabsTrigger value="capture" className="text-lg font-bold">📷 Captura</TabsTrigger>
           </TabsList>
           
           {/* Auto Monitor Tab */}
           <TabsContent value="auto" className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-xl font-bold flex items-center gap-3">
                   🤖 Monitoramento Automático
                   {monitorState.isMonitoring && (
-                    <Badge className="bg-green-600 animate-pulse">Ativo</Badge>
+                    <Badge className="bg-green-600 text-base px-3 py-1 animate-pulse">Ativo</Badge>
                   )}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Status Banner */}
-                <div className={`rounded-lg p-4 ${monitorState.isMonitoring ? 'bg-green-900/30 border border-green-700' : 'bg-gray-700/30 border border-gray-600'}`}>
+              <CardContent className="space-y-5">
+                <div className={`rounded-2xl p-5 ${monitorState.isMonitoring ? 'bg-green-900/30 border-2 border-green-600' : 'bg-gray-700/30 border-2 border-gray-600'}`}>
                   {monitorState.isMonitoring ? (
                     <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-green-400 font-medium">Monitorando sua tela...</span>
+                      <div className="flex items-center gap-3">
+                        <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse" />
+                        <span className="text-xl text-green-400 font-bold">Monitorando sua tela...</span>
                       </div>
-                      <div className="text-sm text-gray-400">
+                      <div className="text-lg text-gray-300">
                         {monitorState.framesAnalyzed} frames analisados
                       </div>
                     </div>
                   ) : (
-                    <p className="text-gray-300">
+                    <p className="text-lg text-gray-200">
                       O modo automático monitora sua tela continuamente e detecta as cartas 
-                      <strong> sem você precisar fazer nada</strong>. Quando as cartas mudam, 
+                      <strong className="text-white"> sem você precisar fazer nada</strong>. Quando as cartas mudam, 
                       a análise é atualizada automaticamente!
                     </p>
                   )}
                 </div>
                 
-                {/* Como funciona */}
                 {!monitorState.isMonitoring && (
-                  <div className="space-y-3">
-                    <h4 className="font-medium text-gray-200">Como funciona:</h4>
-                    <div className="grid gap-3 text-sm">
-                      <div className="flex items-start gap-3 bg-gray-700/20 rounded p-3">
-                        <span className="text-xl">1️⃣</span>
+                  <div className="space-y-4">
+                    <h4 className="text-lg font-bold text-gray-200">Como funciona:</h4>
+                    <div className="grid gap-4">
+                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
+                        <span className="text-3xl">1️⃣</span>
                         <div>
-                          <p className="text-gray-300">Clique em <strong>"Iniciar Monitoramento"</strong></p>
-                          <p className="text-gray-500 text-xs">Selecione a janela do poker</p>
+                          <p className="text-lg text-gray-200">Clique em <strong className="text-white">"Iniciar Monitoramento"</strong></p>
+                          <p className="text-gray-400">Selecione a janela do poker</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3 bg-gray-700/20 rounded p-3">
-                        <span className="text-xl">2️⃣</span>
+                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
+                        <span className="text-3xl">2️⃣</span>
                         <div>
-                          <p className="text-gray-300">O app monitora automaticamente a cada 2.5 segundos</p>
-                          <p className="text-gray-500 text-xs">Detecta mudanças nas cartas</p>
+                          <p className="text-lg text-gray-200">O app monitora automaticamente a cada 2.5 segundos</p>
+                          <p className="text-gray-400">Detecta mudanças nas cartas</p>
                         </div>
                       </div>
-                      <div className="flex items-start gap-3 bg-gray-700/20 rounded p-3">
-                        <span className="text-xl">3️⃣</span>
+                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
+                        <span className="text-3xl">3️⃣</span>
                         <div>
-                          <p className="text-gray-300">Quando você recebe cartas, a análise aparece!</p>
-                          <p className="text-gray-500 text-xs">Flop, turn e river são detectados automaticamente</p>
+                          <p className="text-lg text-gray-200">Quando você recebe cartas, a análise aparece!</p>
+                          <p className="text-gray-400">Flop, turn e river são detectados automaticamente</p>
                         </div>
                       </div>
                     </div>
                   </div>
                 )}
                 
-                {/* Botões de controle */}
-                <div className="flex gap-3">
+                <div className="flex gap-4">
                   {!monitorState.isMonitoring ? (
                     <Button 
                       onClick={autoMonitor.startMonitoring}
-                      className="bg-green-600 hover:bg-green-700 text-lg py-6 px-8"
+                      className="bg-green-600 hover:bg-green-500 text-xl py-8 px-10 font-bold rounded-xl shadow-xl"
                     >
                       ▶️ Iniciar Monitoramento Automático
                     </Button>
@@ -887,33 +927,28 @@ export default function PokerRTA() {
                     <Button 
                       onClick={autoMonitor.stopMonitoring}
                       variant="destructive"
-                      className="text-lg py-6 px-8"
+                      className="text-xl py-8 px-10 font-bold rounded-xl"
                     >
                       ⏹️ Parar Monitoramento
                     </Button>
                   )}
                 </div>
                 
-                {/* Preview da análise atual */}
                 {monitorState.isMonitoring && result && (
-                  <div className="mt-4 border-t border-gray-700 pt-4">
-                    <h4 className="text-sm text-gray-500 mb-3">Última análise detectada:</h4>
-                    <div className="flex items-center gap-4">
-                      <div className="flex gap-1">
+                  <div className="mt-6 border-t-2 border-gray-700 pt-6">
+                    <h4 className="text-base text-gray-400 mb-4 font-medium">Última análise detectada:</h4>
+                    <div className="flex items-center gap-6">
+                      <div className="flex gap-2">
                         {result.state.heroCards.map((card, i) => (
-                          <span key={i} style={{ color: card.color }} className="text-xl font-bold">
-                            {card.display}
-                          </span>
+                          <CardBadge key={i} card={`${card.rank}${card.suit}`} />
                         ))}
                       </div>
                       {result.state.board.length > 0 && (
                         <>
-                          <span className="text-gray-500">|</span>
-                          <div className="flex gap-1">
+                          <span className="text-2xl text-gray-500">|</span>
+                          <div className="flex gap-2">
                             {result.state.board.map((card, i) => (
-                              <span key={i} style={{ color: card.color }} className="text-xl font-bold">
-                                {card.display}
-                              </span>
+                              <CardBadge key={i} card={`${card.rank}${card.suit}`} />
                             ))}
                           </div>
                         </>
@@ -924,12 +959,11 @@ export default function PokerRTA() {
               </CardContent>
             </Card>
             
-            {/* Dica */}
-            <Card className="bg-blue-900/20 border-blue-700/50">
-              <CardContent className="py-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-xl">💡</span>
-                  <div className="text-sm text-blue-300">
+            <Card className="bg-blue-900/20 border-2 border-blue-700 rounded-2xl">
+              <CardContent className="py-5">
+                <div className="flex items-start gap-4">
+                  <span className="text-3xl">💡</span>
+                  <div className="text-lg text-blue-300">
                     <strong>Dica:</strong> Deixe a janela do poker visível na tela. O monitoramento 
                     funciona em segundo plano e você verá um painel no canto superior esquerdo com 
                     a recomendação em tempo real!
@@ -941,12 +975,11 @@ export default function PokerRTA() {
           
           {/* Manual Input Tab */}
           <TabsContent value="manual" className="space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              {/* Left: Input */}
-              <div className="space-y-4">
-                <Card className="bg-gray-800/50 border-gray-700">
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-6">
+                <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
                   <CardHeader>
-                    <CardTitle className="text-lg">🃏 Suas Cartas</CardTitle>
+                    <CardTitle className="text-xl font-bold">🃏 Suas Cartas</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <CardSelector 
@@ -957,9 +990,9 @@ export default function PokerRTA() {
                   </CardContent>
                 </Card>
                 
-                <Card className="bg-gray-800/50 border-gray-700">
+                <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
                   <CardHeader>
-                    <CardTitle className="text-lg">🎴 Board</CardTitle>
+                    <CardTitle className="text-xl font-bold">🎴 Board</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <CardSelector 
@@ -970,71 +1003,72 @@ export default function PokerRTA() {
                   </CardContent>
                 </Card>
                 
-                <Card className="bg-gray-800/50 border-gray-700">
+                <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
                   <CardHeader>
-                    <CardTitle className="text-lg">💰 Informações do Pote</CardTitle>
+                    <CardTitle className="text-xl font-bold">💰 Informações do Pote</CardTitle>
                   </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-4">
+                  <CardContent className="grid grid-cols-2 gap-5">
                     <div>
-                      <Label className="text-sm text-gray-400">Pote</Label>
+                      <Label className="text-base text-gray-300 font-medium">Pote</Label>
                       <Input
                         type="number"
                         value={potSize}
                         onChange={(e) => setPotSize(Number(e.target.value))}
-                        className="bg-gray-900 border-gray-700"
+                        className="bg-gray-900 border-2 border-gray-600 text-lg py-3 rounded-xl"
                       />
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-400">Para Pagar</Label>
+                      <Label className="text-base text-gray-300 font-medium">Para Pagar</Label>
                       <Input
                         type="number"
                         value={betToCall}
                         onChange={(e) => setBetToCall(Number(e.target.value))}
-                        className="bg-gray-900 border-gray-700"
+                        className="bg-gray-900 border-2 border-gray-600 text-lg py-3 rounded-xl"
                       />
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-400">Seu Stack</Label>
+                      <Label className="text-base text-gray-300 font-medium">Seu Stack</Label>
                       <Input
                         type="number"
                         value={stackSize}
                         onChange={(e) => setStackSize(Number(e.target.value))}
-                        className="bg-gray-900 border-gray-700"
+                        className="bg-gray-900 border-2 border-gray-600 text-lg py-3 rounded-xl"
                       />
                     </div>
                     <div>
-                      <Label className="text-sm text-gray-400">Jogadores</Label>
+                      <Label className="text-base text-gray-300 font-medium">Jogadores</Label>
                       <Input
                         type="number"
                         value={numPlayers}
                         onChange={(e) => setNumPlayers(Number(e.target.value))}
                         min={2}
                         max={10}
-                        className="bg-gray-900 border-gray-700"
+                        className="bg-gray-900 border-2 border-gray-600 text-lg py-3 rounded-xl"
                       />
                     </div>
                   </CardContent>
                 </Card>
                 
-                <Card className="bg-gray-800/50 border-gray-700">
+                <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
                   <CardHeader>
-                    <CardTitle className="text-lg">📍 Posição</CardTitle>
+                    <CardTitle className="text-xl font-bold">📍 Posição</CardTitle>
                   </CardHeader>
                   <CardContent>
                     <div className="flex flex-wrap gap-2">
                       {['UTG', 'MP', 'HJ', 'CO', 'BTN', 'SB', 'BB'].map(pos => (
                         <Button
                           key={pos}
-                          size="sm"
+                          size="lg"
                           variant={position === pos ? "default" : "outline"}
                           onClick={() => setPosition(pos)}
+                          className="text-base font-bold px-5"
                         >
                           {pos}
                         </Button>
                       ))}
                     </div>
                     
-                    <Separator className="my-4" />
+                    <Separator className="my-5" />
                     
                     <div className="flex flex-wrap gap-2">
                       {['preflop', 'flop', 'turn', 'river'].map(s => {
@@ -1042,30 +1076,29 @@ export default function PokerRTA() {
                         return (
                           <Button
                             key={s}
-                            size="sm"
+                            size="lg"
                             variant={street === s ? "default" : "outline"}
                             onClick={() => {
                               setStreet(s as any);
                               setViewingHistoryStreet(null);
                             }}
-                            className="relative"
+                            className="relative text-base font-bold px-5"
                           >
                             {s.charAt(0).toUpperCase() + s.slice(1)}
                             {hasHistory && (
-                              <span className="absolute -top-1 -right-1 w-2 h-2 bg-green-500 rounded-full" />
+                              <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-gray-800" />
                             )}
                           </Button>
                         );
                       })}
                     </div>
                     
-                    {/* Botão para avançar street */}
                     {street !== 'river' && heroCards.length >= 2 && (
                       <Button
-                        size="sm"
+                        size="lg"
                         variant="secondary"
                         onClick={advanceStreet}
-                        className="mt-2 w-full"
+                        className="mt-4 w-full text-base font-bold py-6"
                       >
                         ➡️ Próxima Street ({street === 'preflop' ? 'Flop' : street === 'flop' ? 'Turn' : 'River'})
                       </Button>
@@ -1074,13 +1107,12 @@ export default function PokerRTA() {
                 </Card>
               </div>
               
-              {/* Right: Recommendation */}
               <div>
-                <Card className="bg-gray-800/50 border-gray-700 sticky top-4">
+                <Card className="bg-gray-800/50 border-2 border-gray-700 sticky top-6 rounded-2xl">
                   <CardHeader>
-                    <CardTitle className="text-lg flex items-center justify-between">
+                    <CardTitle className="text-xl font-bold flex items-center justify-between">
                       <span>🎯 Recomendação</span>
-                      {isAnalyzing && <span className="text-sm text-blue-500 animate-pulse">Analisando...</span>}
+                      {isAnalyzing && <span className="text-base text-blue-400 animate-pulse font-medium">Analisando...</span>}
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1093,33 +1125,32 @@ export default function PokerRTA() {
           
           {/* Screen Capture Tab */}
           <TabsContent value="capture" className="space-y-6">
-            <Card className="bg-gray-800/50 border-gray-700">
+            <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
+                <CardTitle className="text-xl font-bold flex items-center gap-3">
                   📷 Detecção Automática
-                  <Badge variant="secondary" className="bg-green-900/50 text-green-400">100% Gratuito</Badge>
+                  <Badge variant="secondary" className="bg-green-900/50 text-green-400 text-base px-3">Gratuito</Badge>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Info sobre APIs */}
-                <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <span className="text-2xl">🤖</span>
+              <CardContent className="space-y-5">
+                <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border-2 border-blue-700/50 rounded-2xl p-5">
+                  <div className="flex items-start gap-4">
+                    <span className="text-4xl">🤖</span>
                     <div>
-                      <h4 className="font-semibold text-white mb-1">APIs de Visão Gratuitas</h4>
-                      <p className="text-sm text-gray-300 mb-2">
+                      <h4 className="text-lg font-bold text-white mb-2">APIs de Visão Gratuitas</h4>
+                      <p className="text-base text-gray-300 mb-3">
                         Detectamos suas cartas automaticamente usando:
                       </p>
                       <div className="flex flex-wrap gap-2">
-                        <Badge variant="outline" className="text-xs">Hugging Face BLIP</Badge>
-                        <Badge variant="outline" className="text-xs">OCR.space</Badge>
-                        <Badge variant="outline" className="text-xs">DeepAI</Badge>
+                        <Badge variant="outline" className="text-sm px-3 py-1">Hugging Face BLIP</Badge>
+                        <Badge variant="outline" className="text-sm px-3 py-1">OCR.space</Badge>
+                        <Badge variant="outline" className="text-sm px-3 py-1">DeepAI</Badge>
                       </div>
                     </div>
                   </div>
                 </div>
                 
-                <p className="text-sm text-gray-400">
+                <p className="text-base text-gray-300">
                   <strong>Como usar:</strong> Clique em "Capturar Tela", selecione a janela do poker, 
                   e clique em "Analisar Frame". As cartas serão detectadas automaticamente!
                 </p>
@@ -1127,30 +1158,31 @@ export default function PokerRTA() {
                 <ScreenCapture onCapture={handleCapture} />
                 
                 {isAnalyzing && (
-                  <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
-                      <span className="text-blue-400 font-medium">Analisando imagem...</span>
+                  <div className="bg-blue-900/20 border-2 border-blue-700/50 rounded-2xl p-5 text-center">
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                      <div className="w-5 h-5 border-3 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-xl text-blue-400 font-bold">Analisando imagem...</span>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-base text-gray-400">
                       Consultando APIs de visão gratuitas...
                     </div>
                   </div>
                 )}
                 
                 {detectionMessage && (
-                  <div className={`rounded-lg p-4 ${detectionMessage.startsWith('✅') ? 'bg-green-900/30 border border-green-700' : 'bg-yellow-900/30 border border-yellow-700'}`}>
-                    <p className={`text-sm ${detectionMessage.startsWith('✅') ? 'text-green-300' : 'text-yellow-300'}`}>
+                  <div className={`rounded-2xl p-5 ${detectionMessage.startsWith('✅') ? 'bg-green-900/30 border-2 border-green-700' : 'bg-yellow-900/30 border-2 border-yellow-700'}`}>
+                    <p className={`text-base font-medium ${detectionMessage.startsWith('✅') ? 'text-green-300' : 'text-yellow-300'}`}>
                       {detectionMessage}
                     </p>
                     {!detectionMessage.startsWith('✅') && (
-                      <div className="mt-3 flex gap-2">
+                      <div className="mt-4">
                         <Button 
-                          size="sm" 
+                          size="lg" 
                           onClick={() => {
                             setDetectionMessage(null);
                             setActiveTab('manual');
                           }}
+                          className="font-bold"
                         >
                           ✏️ Usar Modo Manual
                         </Button>
@@ -1162,9 +1194,9 @@ export default function PokerRTA() {
             </Card>
             
             {result && (
-              <Card className="bg-gray-800/50 border-gray-700">
+              <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
                 <CardHeader>
-                  <CardTitle className="text-lg">🎯 Recomendação</CardTitle>
+                  <CardTitle className="text-xl font-bold">🎯 Recomendação</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <RecommendationDisplay result={result} />
@@ -1172,16 +1204,15 @@ export default function PokerRTA() {
               </Card>
             )}
             
-            {/* Dica para modo manual */}
-            <Card className="bg-gray-800/30 border-gray-700/50">
-              <CardContent className="py-4">
-                <div className="flex items-center gap-3 text-sm text-gray-400">
-                  <span>💡</span>
+            <Card className="bg-gray-800/30 border-2 border-gray-700 rounded-2xl">
+              <CardContent className="py-5">
+                <div className="flex items-center gap-4 text-base text-gray-400">
+                  <span className="text-2xl">💡</span>
                   <span>
                     <strong>Dica:</strong> Se a detecção automática não funcionar perfeitamente, 
                     você sempre pode usar o <Button 
                       variant="link" 
-                      className="px-1 h-auto text-blue-400" 
+                      className="px-1 h-auto text-blue-400 text-base font-bold" 
                       onClick={() => setActiveTab('manual')}
                     >
                       Modo Manual
@@ -1194,12 +1225,10 @@ export default function PokerRTA() {
         </Tabs>
       </main>
       
-      {/* Compact Mode Overlay */}
       {compactMode && <CompactMode result={result} />}
       
-      {/* Footer */}
-      <footer className="border-t border-gray-700 bg-black/30 mt-8">
-        <div className="max-w-6xl mx-auto px-4 py-4 text-center text-xs text-gray-500">
+      <footer className="border-t-2 border-gray-700 bg-black/30 mt-12">
+        <div className="max-w-6xl mx-auto px-4 py-5 text-center text-base text-gray-500 font-medium">
           Poker RTA - Assistência em Tempo Real | Baseado em matemática e teoria dos jogos
         </div>
       </footer>
