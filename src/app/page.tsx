@@ -790,42 +790,67 @@ export default function PokerRTA() {
           <TabsContent value="capture" className="space-y-6">
             <Card className="bg-gray-800/50 border-gray-700">
               <CardHeader>
-                <CardTitle className="text-lg">📷 Captura de Tela (Gratuito)</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  📷 Detecção Automática
+                  <Badge variant="secondary" className="bg-green-900/50 text-green-400">100% Gratuito</Badge>
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="bg-blue-900/30 border border-blue-700 rounded p-3 text-sm">
-                  <p className="text-blue-300">
-                    <strong>🆓 Modo Gratuito:</strong> Detecção funciona 100% no seu navegador, sem APIs externas.
-                  </p>
+                {/* Info sobre APIs */}
+                <div className="bg-gradient-to-r from-blue-900/30 to-purple-900/30 border border-blue-700/50 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <span className="text-2xl">🤖</span>
+                    <div>
+                      <h4 className="font-semibold text-white mb-1">APIs de Visão Gratuitas</h4>
+                      <p className="text-sm text-gray-300 mb-2">
+                        Detectamos suas cartas automaticamente usando:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline" className="text-xs">Hugging Face BLIP</Badge>
+                        <Badge variant="outline" className="text-xs">OCR.space</Badge>
+                        <Badge variant="outline" className="text-xs">DeepAI</Badge>
+                      </div>
+                    </div>
+                  </div>
                 </div>
                 
                 <p className="text-sm text-gray-400">
-                  Clique em "Capturar Tela" e selecione a janela do poker. 
-                  Depois clique em "Analisar Frame" para obter a recomendação.
+                  <strong>Como usar:</strong> Clique em "Capturar Tela", selecione a janela do poker, 
+                  e clique em "Analisar Frame". As cartas serão detectadas automaticamente!
                 </p>
                 
                 <ScreenCapture onCapture={handleCapture} />
                 
                 {isAnalyzing && (
-                  <div className="text-center py-4">
-                    <div className="animate-pulse text-blue-500">🔍 Analisando imagem...</div>
-                    <div className="text-xs text-gray-500 mt-1">Detecção local em andamento</div>
+                  <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                      <span className="text-blue-400 font-medium">Analisando imagem...</span>
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      Consultando APIs de visão gratuitas...
+                    </div>
                   </div>
                 )}
                 
                 {detectionMessage && (
-                  <div className="bg-yellow-900/30 border border-yellow-700 rounded p-3">
-                    <p className="text-yellow-300 text-sm">{detectionMessage}</p>
-                    <Button 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => {
-                        setDetectionMessage(null);
-                        setActiveTab('manual');
-                      }}
-                    >
-                      ✏️ Ir para Modo Manual
-                    </Button>
+                  <div className={`rounded-lg p-4 ${detectionMessage.startsWith('✅') ? 'bg-green-900/30 border border-green-700' : 'bg-yellow-900/30 border border-yellow-700'}`}>
+                    <p className={`text-sm ${detectionMessage.startsWith('✅') ? 'text-green-300' : 'text-yellow-300'}`}>
+                      {detectionMessage}
+                    </p>
+                    {!detectionMessage.startsWith('✅') && (
+                      <div className="mt-3 flex gap-2">
+                        <Button 
+                          size="sm" 
+                          onClick={() => {
+                            setDetectionMessage(null);
+                            setActiveTab('manual');
+                          }}
+                        >
+                          ✏️ Usar Modo Manual
+                        </Button>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>
@@ -841,6 +866,25 @@ export default function PokerRTA() {
                 </CardContent>
               </Card>
             )}
+            
+            {/* Dica para modo manual */}
+            <Card className="bg-gray-800/30 border-gray-700/50">
+              <CardContent className="py-4">
+                <div className="flex items-center gap-3 text-sm text-gray-400">
+                  <span>💡</span>
+                  <span>
+                    <strong>Dica:</strong> Se a detecção automática não funcionar perfeitamente, 
+                    você sempre pode usar o <Button 
+                      variant="link" 
+                      className="px-1 h-auto text-blue-400" 
+                      onClick={() => setActiveTab('manual')}
+                    >
+                      Modo Manual
+                    </Button> para selecionar suas cartas rapidamente.
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </main>
