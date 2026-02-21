@@ -448,45 +448,13 @@ export default function PokerRTA() {
     }
   }, [heroCards, boardCards, potSize, betToCall, stackSize, street, position, numPlayers]);
   
-  // Screen capture analysis
+  // Screen capture analysis - 100% GRATUITO
   const handleCapture = useCallback(async (imageData: string) => {
     setIsAnalyzing(true);
+    setDetectionMessage(null);
     
     try {
-      // PRIMEIRO: Tentar detecção local (100% gratuito)
-      const { detectPokerCards } = await import('@/lib/card-detector');
-      const localResult = await detectPokerCards(imageData);
-      
-      if (localResult.heroCards.length >= 2) {
-        // Detecção local funcionou!
-        setHeroCards(localResult.heroCards);
-        setBoardCards(localResult.board);
-        setPotSize(localResult.potSize);
-        setStreet(localResult.board.length >= 3 ? 'flop' : 'preflop');
-        
-        // Analisar com cartas detectadas
-        const analyzeResponse = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            heroCards: localResult.heroCards,
-            board: localResult.board,
-            potSize: localResult.potSize,
-            betToCall: 0,
-            stackSize: 1000,
-            street: localResult.board.length >= 3 ? 'flop' : 'preflop',
-            position: 'BTN',
-            numPlayers: 2
-          })
-        });
-        
-        const analyzeData = await analyzeResponse.json();
-        setResult(analyzeData);
-        setIsAnalyzing(false);
-        return;
-      }
-      
-      // SEGUNDO: Tentar API como fallback
+      // Chamar API de detecção GRATUITA (sem API key necessário)
       const detectResponse = await fetch('/api/detect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -495,20 +463,19 @@ export default function PokerRTA() {
       
       const detectData = await detectResponse.json();
       
-      if (detectData.success && detectData.gameState) {
-        const state = detectData.gameState as DetectedState;
+      if (detectData.success && detectData.gameState?.heroCards?.length >= 2) {
+        // Detecção funcionou!
+        const state = detectData.gameState;
+        const usedApi = detectData.usedApi || 'local';
         
-        // Update local state
-        setHeroCards(state.heroCards || []);
+        setHeroCards(state.heroCards);
         setBoardCards(state.board || []);
         setPotSize(state.potSize || 0);
-        setBetToCall(state.betToCall || 0);
-        setStackSize(state.myStack || 1000);
         setStreet(state.street || 'preflop');
-        setPosition(state.position || 'BTN');
-        setNumPlayers(state.numPlayers || 6);
         
-        // Then analyze
+        setDetectionMessage(`✅ Detectado via ${usedApi}: ${state.heroCards.join(', ')}${state.board?.length ? ' | Board: ' + state.board.join(', ') : ''}`);
+        
+        // Analisar com cartas detectadas
         const analyzeResponse = await fetch('/api/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -516,21 +483,23 @@ export default function PokerRTA() {
             heroCards: state.heroCards,
             board: state.board,
             potSize: state.potSize,
-            betToCall: state.betToCall,
-            stackSize: state.myStack,
+            betToCall: 0,
+            stackSize: 1000,
             street: state.street,
-            position: state.position,
-            numPlayers: state.numPlayers
+            position: 'BTN',
+            numPlayers: 2
           })
         });
         
         const analyzeData = await analyzeResponse.json();
         setResult(analyzeData);
+      } else {
+        // Detecção falhou
+        setDetectionMessage(detectData.message || 'Não foi possível detectar as cartas automaticamente.');
       }
     } catch (error) {
       console.error('Capture analysis error:', error);
-      setDetectionMessage('Não foi possível detectar cartas automaticamente. Use o modo manual para selecionar suas cartas.');
-      setActiveTab('manual');
+      setDetectionMessage('Erro na análise. Use o modo manual para selecionar suas cartas.');
     } finally {
       setIsAnalyzing(false);
     }
