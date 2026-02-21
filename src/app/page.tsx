@@ -343,6 +343,58 @@ function CompactMode({ result }: { result: AnalysisResult | null }) {
   );
 }
 
+// PWA Install Button Component
+function InstallButton() {
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstalled, setIsInstalled] = useState(() => {
+    // Initialize based on whether already running as installed app
+    if (typeof window !== 'undefined') {
+      return window.matchMedia('(display-mode: standalone)').matches;
+    }
+    return false;
+  });
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) {
+      // Fallback: show instructions
+      alert('Para instalar:\n\nNo Chrome/Edge: Menu → "Instalar app"\nNo Safari iOS: Compartilhar → "Adicionar à Tela de Início"');
+      return;
+    }
+
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    
+    if (outcome === 'accepted') {
+      setIsInstalled(true);
+    }
+    setDeferredPrompt(null);
+  };
+
+  if (isInstalled) return null;
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      onClick={handleInstall}
+      className="gap-2"
+    >
+      📥 Instalar App
+    </Button>
+  );
+}
+
 // ==================== MAIN PAGE ====================
 
 export default function PokerRTA() {
@@ -470,6 +522,7 @@ export default function PokerRTA() {
           </div>
           
           <div className="flex items-center gap-3">
+            <InstallButton />
             <Button
               variant={compactMode ? "default" : "outline"}
               size="sm"
