@@ -302,12 +302,14 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   const [stream, setStream] = useState<MediaStream | null>(null);
   
   const startCapture = async () => {
+    console.log('📷 Iniciando captura...');
     try {
       const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { displaySurface: 'window' } as any,
+        video: true,
         audio: false
       });
       
+      console.log('✅ Stream obtido');
       setStream(mediaStream);
       
       if (videoRef.current) {
@@ -320,8 +322,9 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       mediaStream.getVideoTracks()[0].onended = () => {
         stopCapture();
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error starting capture:', error);
+      alert('Erro ao capturar tela: ' + error.message);
     }
   };
   
@@ -354,15 +357,28 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
     <div className="space-y-4">
       <div className="flex gap-3">
         {!isStreaming ? (
-          <Button onClick={startCapture} className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl">
+          <Button 
+            type="button"
+            onClick={startCapture} 
+            className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl"
+          >
             📷 Capturar Tela
           </Button>
         ) : (
           <>
-            <Button onClick={captureFrame} className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl">
+            <Button 
+              type="button"
+              onClick={captureFrame} 
+              className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl"
+            >
               🎯 Analisar Frame
             </Button>
-            <Button onClick={stopCapture} variant="destructive" className="text-lg py-6 px-8 font-bold rounded-xl">
+            <Button 
+              type="button"
+              onClick={stopCapture} 
+              variant="destructive" 
+              className="text-lg py-6 px-8 font-bold rounded-xl"
+            >
               Parar
             </Button>
           </>
@@ -918,13 +934,23 @@ export default function PokerRTA() {
                 <div className="flex gap-4">
                   {!monitorState.isMonitoring ? (
                     <Button 
-                      onClick={autoMonitor.startMonitoring}
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          console.log('Botão clicado!');
+                          await autoMonitor.startMonitoring();
+                        } catch (err: any) {
+                          console.error('Erro:', err);
+                          alert('Erro ao iniciar: ' + err.message);
+                        }
+                      }}
                       className="bg-green-600 hover:bg-green-500 text-xl py-8 px-10 font-bold rounded-xl shadow-xl"
                     >
                       ▶️ Iniciar Monitoramento Automático
                     </Button>
                   ) : (
                     <Button 
+                      type="button"
                       onClick={autoMonitor.stopMonitoring}
                       variant="destructive"
                       className="text-xl py-8 px-10 font-bold rounded-xl"
