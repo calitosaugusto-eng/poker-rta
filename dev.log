@@ -130,3 +130,17 @@ https://nextjs.org/telemetry
  GET / 200 in 49ms (compile: 3ms, render: 46ms)
  GET / 200 in 33ms (compile: 1838µs, render: 31ms)
  GET / 200 in 38ms (compile: 2ms, render: 36ms)
+ GET / 200 in 31ms (compile: 2ms, render: 28ms)
+⨯ ReferenceError: isScreenCaptureSupported is not defined
+    at useAutoMonitor (src/hooks/use-auto-monitor.ts:247:18)
+    at PokerRTA (src/app/page.tsx:650:37)
+  245 |     startMonitoring,
+  246 |     stopMonitoring,
+> 247 |     isSupported: isScreenCaptureSupported()
+      |                  ^
+  248 |   };
+  249 | }
+  250 | {
+  digest: '3402320442'
+}
+ GET / 500 in 196ms (compile: 62ms, render: 133ms)

@@ -300,31 +300,11 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Verificar suporte
-  const isSupported = typeof navigator !== 'undefined' && 
-                      navigator.mediaDevices && 
-                      typeof navigator.mediaDevices.getDisplayMedia === 'function';
   
   const startCapture = async () => {
-    console.log('📷 Iniciando captura...');
-    setError(null);
-    
-    if (!isSupported) {
-      const msg = 'Seu navegador não suporta captura de tela. Use Chrome, Edge ou Firefox em HTTPS.';
-      setError(msg);
-      alert(msg);
-      return;
-    }
-    
     try {
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: false
-      });
+      const mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       
-      console.log('✅ Stream obtido');
       setStream(mediaStream);
       
       if (videoRef.current) {
@@ -335,12 +315,11 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       setIsStreaming(true);
       
       mediaStream.getVideoTracks()[0].onended = () => {
-        stopCapture();
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        setIsStreaming(false);
       };
     } catch (err: any) {
-      console.error('Error starting capture:', err);
-      setError(err.message);
-      alert('Erro ao capturar tela: ' + err.message);
+      alert('Erro ao capturar: ' + err.message);
     }
   };
   
@@ -364,54 +343,23 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
     const ctx = canvas.getContext('2d');
     if (ctx) {
       ctx.drawImage(video, 0, 0);
-      const imageData = canvas.toDataURL('image/png');
-      onCapture(imageData);
+      onCapture(canvas.toDataURL('image/png'));
     }
   };
   
-  if (!isSupported) {
-    return (
-      <div className="bg-yellow-900/30 border-2 border-yellow-600 rounded-xl p-4">
-        <p className="text-yellow-300">
-          ⚠️ Captura de tela não suportada neste navegador. 
-          Use Chrome, Edge ou Firefox em uma conexão HTTPS.
-        </p>
-      </div>
-    );
-  }
-  
   return (
     <div className="space-y-4">
-      {error && (
-        <div className="bg-red-900/30 border-2 border-red-600 rounded-xl p-4">
-          <p className="text-red-300">❌ {error}</p>
-        </div>
-      )}
-      
       <div className="flex gap-3">
         {!isStreaming ? (
-          <Button 
-            type="button"
-            onClick={startCapture} 
-            className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl"
-          >
+          <Button type="button" onClick={startCapture} className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl">
             📷 Capturar Tela
           </Button>
         ) : (
           <>
-            <Button 
-              type="button"
-              onClick={captureFrame} 
-              className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl"
-            >
+            <Button type="button" onClick={captureFrame} className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl">
               🎯 Analisar Frame
             </Button>
-            <Button 
-              type="button"
-              onClick={stopCapture} 
-              variant="destructive" 
-              className="text-lg py-6 px-8 font-bold rounded-xl"
-            >
+            <Button type="button" onClick={stopCapture} variant="destructive" className="text-lg py-6 px-8 font-bold rounded-xl">
               Parar
             </Button>
           </>
@@ -420,13 +368,7 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       
       {isStreaming && (
         <div className="relative rounded-xl overflow-hidden bg-black border-2 border-gray-600">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-auto max-h-48 object-contain"
-          />
+          <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto max-h-48 object-contain" />
         </div>
       )}
       
