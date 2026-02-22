@@ -1,9 +1,9 @@
 /**
  * Auto Screen Monitor for Poker RTA
- * Versão simplificada - sem problemas de memoização
+ * Com verificação de compatibilidade
  */
 
-import { useRef, useEffect, useState, useMemo } from 'react';
+import { useRef, useEffect, useState } from 'react';
 
 export interface AutoMonitorConfig {
   intervalMs: number;
@@ -24,6 +24,13 @@ export interface MonitorState {
   lastCards: string[];
 }
 
+// Verificar se a API está disponível
+const isScreenCaptureSupported = () => {
+  return typeof navigator !== 'undefined' && 
+         navigator.mediaDevices && 
+         typeof navigator.mediaDevices.getDisplayMedia === 'function';
+};
+
 export function useAutoMonitor(config: AutoMonitorConfig) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -34,7 +41,6 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   const isMonitoringRef = useRef<boolean>(false);
   const configRef = useRef(config);
   
-  // Manter config atualizado via effect
   useEffect(() => {
     configRef.current = config;
   }, [config]);
@@ -47,7 +53,6 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
     lastCards: []
   });
 
-  // Funções definidas sem useCallback para evitar problemas
   const updateState = (updates: Partial<MonitorState>) => {
     setState(prev => ({ ...prev, ...updates }));
   };
@@ -105,20 +110,18 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
     
     framesCountRef.current += 1;
     
-    const newState = {
-      isMonitoring: true,
-      lastCapture: new Date(),
-      framesAnalyzed: framesCountRef.current,
-      cardsDetected: false,
-      lastCards: [] as string[]
-    };
-    
     updateState({
       framesAnalyzed: framesCountRef.current,
       lastCapture: new Date()
     });
     
-    configRef.current.onChange(newState);
+    configRef.current.onChange({
+      isMonitoring: true,
+      lastCapture: new Date(),
+      framesAnalyzed: framesCountRef.current,
+      cardsDetected: state.cardsDetected,
+      lastCards: state.lastCards
+    });
     
     analyzeFrame(imageData);
   };
@@ -158,6 +161,14 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   const startMonitoring = async () => {
     console.log('▶️ Iniciando monitoramento...');
     
+    // Verificar suporte
+    if (!isScreenCaptureSupported()) {
+      const errorMsg = 'Seu navegador não suporta captura de tela. Use Chrome, Edge ou Firefox atualizado em HTTPS.';
+      console.error('❌', errorMsg);
+      alert(errorMsg);
+      return;
+    }
+    
     try {
       const stream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -192,13 +203,10 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       updateState(initialState);
       configRef.current.onChange(initialState);
       
-      // Iniciar loop de captura
       intervalRef.current = setInterval(runMonitorLoop, configRef.current.intervalMs);
       
-      // Primeira captura após 1 segundo
       setTimeout(runMonitorLoop, 1000);
       
-      // Parar quando o usuário encerrar o compartilhamento
       stream.getVideoTracks()[0].onended = () => {
         console.log('🛑 Stream encerrado pelo usuário');
         stopMonitoring();
@@ -208,12 +216,12 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
       
     } catch (error: any) {
       console.error('❌ Erro ao iniciar monitoramento:', error.message);
+      alert('Erro ao iniciar monitoramento: ' + error.message);
       isMonitoringRef.current = false;
       updateState({ isMonitoring: false });
     }
   };
 
-  // Cleanup ao desmontar
   useEffect(() => {
     return () => {
       isMonitoringRef.current = false;
@@ -227,6 +235,7 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   return {
     state,
     startMonitoring,
-    stopMonitoring
+    stopMonitoring,
+    isSupported: isScreenCaptureSupported()
   };
 }

@@ -300,9 +300,24 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Verificar suporte
+  const isSupported = typeof navigator !== 'undefined' && 
+                      navigator.mediaDevices && 
+                      typeof navigator.mediaDevices.getDisplayMedia === 'function';
   
   const startCapture = async () => {
     console.log('📷 Iniciando captura...');
+    setError(null);
+    
+    if (!isSupported) {
+      const msg = 'Seu navegador não suporta captura de tela. Use Chrome, Edge ou Firefox em HTTPS.';
+      setError(msg);
+      alert(msg);
+      return;
+    }
+    
     try {
       const mediaStream = await navigator.mediaDevices.getDisplayMedia({
         video: true,
@@ -314,7 +329,7 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
+        await videoRef.current.play();
       }
       
       setIsStreaming(true);
@@ -322,9 +337,10 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
       mediaStream.getVideoTracks()[0].onended = () => {
         stopCapture();
       };
-    } catch (error: any) {
-      console.error('Error starting capture:', error);
-      alert('Erro ao capturar tela: ' + error.message);
+    } catch (err: any) {
+      console.error('Error starting capture:', err);
+      setError(err.message);
+      alert('Erro ao capturar tela: ' + err.message);
     }
   };
   
@@ -353,8 +369,25 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
     }
   };
   
+  if (!isSupported) {
+    return (
+      <div className="bg-yellow-900/30 border-2 border-yellow-600 rounded-xl p-4">
+        <p className="text-yellow-300">
+          ⚠️ Captura de tela não suportada neste navegador. 
+          Use Chrome, Edge ou Firefox em uma conexão HTTPS.
+        </p>
+      </div>
+    );
+  }
+  
   return (
     <div className="space-y-4">
+      {error && (
+        <div className="bg-red-900/30 border-2 border-red-600 rounded-xl p-4">
+          <p className="text-red-300">❌ {error}</p>
+        </div>
+      )}
+      
       <div className="flex gap-3">
         {!isStreaming ? (
           <Button 
@@ -391,6 +424,7 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
             ref={videoRef}
             autoPlay
             playsInline
+            muted
             className="w-full h-auto max-h-48 object-contain"
           />
         </div>
