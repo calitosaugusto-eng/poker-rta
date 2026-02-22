@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 
 interface AutoMonitorProps {
@@ -11,25 +11,82 @@ interface AutoMonitorProps {
   }) => void;
 }
 
+// Helper para verificar suporte a Screen Capture API
+function checkScreenCaptureSupport(): { supported: boolean; reason: string } {
+  if (typeof window === 'undefined') {
+    return { supported: false, reason: 'Renderização no servidor' };
+  }
+  
+  if (!window.navigator) {
+    return { supported: false, reason: 'Navigator não disponível' };
+  }
+  
+  if (!window.navigator.mediaDevices) {
+    return { supported: false, reason: 'mediaDevices não disponível - use HTTPS' };
+  }
+  
+  if (typeof window.navigator.mediaDevices.getDisplayMedia !== 'function') {
+    return { supported: false, reason: 'getDisplayMedia não suportado neste navegador' };
+  }
+  
+  return { supported: true, reason: '' };
+}
+
 export default function AutoMonitor({ onDetect }: AutoMonitorProps) {
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [framesAnalyzed, setFramesAnalyzed] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [isSupported, setIsSupported] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return checkScreenCaptureSupport().supported;
+  });
+  const [supportReason, setSupportReason] = useState(() => {
+    if (typeof window === 'undefined') return 'Renderização no servidor';
+    return checkScreenCaptureSupport().reason;
+  });
   
   const streamRef = useRef<MediaStream | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isMonitoringRef = useRef<boolean>(false);
   
-  const analyzeFrame = async () => {
-    if (!streamRef.current) return;
-    
-    const video = document.createElement('video');
-    video.srcObject = streamRef.current;
-    video.muted = true;
+  const analyzeFrame = useCallback(async () => {
+    const stream = streamRef.current;
+    if (!stream) return;
     
     try {
-      await video.play();
+      // Criar vídeo se não existir
+      if (!videoRef.current) {
+        videoRef.current = document.createElement('video');
+        videoRef.current.muted = true;
+        videoRef.current.playsInline = true;
+      }
       
-      const canvas = document.createElement('canvas');
+      const video = videoRef.current;
+      
+      // Só configurar srcObject se mudou
+      if (video.srcObject !== stream) {
+        video.srcObject = stream;
+        await video.play();
+      }
+      
+      // Aguardar frame estar pronto
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
+      
+      if (video.videoWidth === 0 || video.videoHeight === 0) {
+        console.log('Vídeo não está pronto');
+        return;
+      }
+      
+      // Criar canvas se não existir
+      if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+      }
+      
+      const canvas = canvasRef.current;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       
@@ -60,23 +117,55 @@ export default function AutoMonitor({ onDetect }: AutoMonitorProps) {
       
     } catch (err) {
       console.error('Frame analysis error:', err);
-    } finally {
-      video.pause();
-      video.srcObject = null;
     }
-  };
+  }, [onDetect]);
   
-  const startMonitoring = async () => {
+  // Definir stopMonitoring primeiro para evitar referência antes de declaração
+  const stopMonitoring = useCallback(() => {
+    isMonitoringRef.current = false;
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    // Limpar vídeo
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+    }
+    
+    setIsMonitoring(false);
+  }, []);
+  
+  const startMonitoring = useCallback(async () => {
     setError(null);
     
+    // Verificação dupla antes de tentar
+    const { supported, reason } = checkScreenCaptureSupport();
+    if (!supported) {
+      setError(`Não suportado: ${reason}. Use Chrome/Edge em HTTPS.`);
+      return;
+    }
+    
     try {
-      // @ts-ignore
-      const stream = await navigator.mediaDevices.getDisplayMedia({ 
-        video: true, 
+      // Chamar a API com o contexto correto
+      const getDisplayMedia = window.navigator.mediaDevices.getDisplayMedia.bind(
+        window.navigator.mediaDevices
+      );
+      
+      const stream = await getDisplayMedia({ 
+        video: { displaySurface: 'monitor' } as any, 
         audio: false 
       });
       
       streamRef.current = stream;
+      isMonitoringRef.current = true;
       setIsMonitoring(true);
       setFramesAnalyzed(0);
       
@@ -92,24 +181,21 @@ export default function AutoMonitor({ onDetect }: AutoMonitorProps) {
       };
       
     } catch (err: any) {
-      setError(err.message);
+      console.error('Screen capture error:', err);
+      
+      if (err.name === 'NotAllowedError') {
+        setError('Permissão negada. Permita o compartilhamento de tela.');
+      } else if (err.name === 'NotSupportedError') {
+        setError('Screen capture não suportado neste navegador.');
+      } else if (err.name === 'AbortError') {
+        setError('Captura cancelada pelo usuário.');
+      } else {
+        setError(`Erro: ${err.message || 'Desconhecido'}`);
+      }
     }
-  };
+  }, [analyzeFrame, stopMonitoring]);
   
-  const stopMonitoring = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-    
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    setIsMonitoring(false);
-  };
-  
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
@@ -119,6 +205,19 @@ export default function AutoMonitor({ onDetect }: AutoMonitorProps) {
   
   return (
     <div className="space-y-4">
+      {/* Aviso de suporte */}
+      {!isSupported && (
+        <div className="bg-yellow-900/30 border-2 border-yellow-600 rounded-xl p-4">
+          <p className="text-yellow-300">
+            ⚠️ Screen Capture não disponível: {supportReason}
+          </p>
+          <p className="text-yellow-200 text-sm mt-2">
+            Use Chrome, Edge ou Firefox com HTTPS.
+          </p>
+        </div>
+      )}
+      
+      {/* Erros */}
       {error && (
         <div className="bg-red-900/30 border-2 border-red-600 rounded-xl p-4">
           <p className="text-red-300">❌ {error}</p>
@@ -129,7 +228,8 @@ export default function AutoMonitor({ onDetect }: AutoMonitorProps) {
         {!isMonitoring ? (
           <Button 
             onClick={startMonitoring}
-            className="bg-green-600 hover:bg-green-500 text-xl py-8 px-10 font-bold rounded-xl shadow-xl"
+            disabled={!isSupported}
+            className="bg-green-600 hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed text-xl py-8 px-10 font-bold rounded-xl shadow-xl"
           >
             ▶️ Iniciar Monitoramento Automático
           </Button>
