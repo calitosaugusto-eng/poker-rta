@@ -144,3 +144,10 @@ https://nextjs.org/telemetry
   digest: '3402320442'
 }
  GET / 500 in 196ms (compile: 62ms, render: 133ms)
+ GET / 200 in 182ms (compile: 68ms, render: 115ms)
+ GET / 200 in 35ms (compile: 1999µs, render: 33ms)
+ GET / 200 in 36ms (compile: 2ms, render: 34ms)
+ GET / 200 in 31ms (compile: 1579µs, render: 29ms)
+✓ Compiled in 127ms
+✓ Compiled in 107ms
+✓ Compiled in 127ms

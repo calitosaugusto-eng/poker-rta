@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { useAutoMonitor } from '@/hooks/use-auto-monitor';
+import dynamic from 'next/dynamic';
 import {
   parseCard,
   generateRecommendation,
@@ -20,6 +20,10 @@ import {
   SUIT_COLORS,
   cardToDisplay
 } from '@/lib/poker-engine';
+
+// Carregar componentes dinamicamente sem SSR
+const ScreenCapture = dynamic(() => import('@/components/ScreenCapture'), { ssr: false });
+const AutoMonitor = dynamic(() => import('@/components/AutoMonitor'), { ssr: false });
 
 // ==================== TIPOS ====================
 
@@ -294,95 +298,6 @@ function RecommendationDisplay({ result }: { result: AnalysisResult | null }) {
   );
 }
 
-// Captura de tela
-function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [stream, setStream] = useState<MediaStream | null>(null);
-  
-  const startCapture = async () => {
-    // Verificar se está no navegador
-    if (typeof window === 'undefined' || !window.navigator?.mediaDevices?.getDisplayMedia) {
-      alert('Captura de tela não disponível. Use Chrome/Edge/Firefox com HTTPS.');
-      return;
-    }
-    
-    try {
-      const mediaStream = await window.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
-      
-      setStream(mediaStream);
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        await videoRef.current.play();
-      }
-      
-      setIsStreaming(true);
-      
-      mediaStream.getVideoTracks()[0].onended = () => {
-        if (stream) stream.getTracks().forEach(track => track.stop());
-        setIsStreaming(false);
-      };
-    } catch (err: any) {
-      alert('Erro ao capturar: ' + err.message);
-    }
-  };
-  
-  const stopCapture = () => {
-    if (stream) {
-      stream.getTracks().forEach(track => track.stop());
-      setStream(null);
-    }
-    setIsStreaming(false);
-  };
-  
-  const captureFrame = () => {
-    if (!videoRef.current || !canvasRef.current) return;
-    
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      ctx.drawImage(video, 0, 0);
-      onCapture(canvas.toDataURL('image/png'));
-    }
-  };
-  
-  return (
-    <div className="space-y-4">
-      <div className="flex gap-3">
-        {!isStreaming ? (
-          <Button type="button" onClick={startCapture} className="bg-blue-600 hover:bg-blue-500 text-lg py-6 px-8 font-bold rounded-xl">
-            📷 Capturar Tela
-          </Button>
-        ) : (
-          <>
-            <Button type="button" onClick={captureFrame} className="bg-green-600 hover:bg-green-500 text-lg py-6 px-8 font-bold rounded-xl">
-              🎯 Analisar Frame
-            </Button>
-            <Button type="button" onClick={stopCapture} variant="destructive" className="text-lg py-6 px-8 font-bold rounded-xl">
-              Parar
-            </Button>
-          </>
-        )}
-      </div>
-      
-      {isStreaming && (
-        <div className="relative rounded-xl overflow-hidden bg-black border-2 border-gray-600">
-          <video ref={videoRef} autoPlay playsInline muted className="w-full h-auto max-h-48 object-contain" />
-        </div>
-      )}
-      
-      <canvas ref={canvasRef} className="hidden" />
-    </div>
-  );
-}
-
 // Modo compacto
 function CompactMode({ result }: { result: AnalysisResult | null }) {
   if (!result) return null;
@@ -464,104 +379,6 @@ function InstallButton() {
   );
 }
 
-// Overlay de Monitoramento Automático
-interface AutoMonitorOverlayProps {
-  result: AnalysisResult | null;
-  monitorState: {
-    isMonitoring: boolean;
-    framesAnalyzed: number;
-    lastCapture: Date | null;
-  };
-  onStop: () => void;
-}
-
-function AutoMonitorOverlay({ result, monitorState, onStop }: AutoMonitorOverlayProps) {
-  if (!monitorState.isMonitoring) return null;
-  
-  return (
-    <div className="fixed top-6 left-6 z-50">
-      <Card className="bg-black/95 border-2 border-green-500 shadow-2xl min-w-[320px] rounded-2xl">
-        <CardHeader className="py-4 px-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-lg font-bold text-green-400">Monitorando</span>
-            </div>
-            <Button size="sm" variant="ghost" onClick={onStop} className="h-8 px-3 text-sm font-medium">
-              Parar
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="py-4 px-5">
-          {result ? (
-            <div className="space-y-4">
-              {/* Cards */}
-              <div className="flex items-center gap-3">
-                <span className="text-sm text-gray-400 font-medium">Cartas:</span>
-                <div className="flex gap-1">
-                  {result.state.heroCards.map((card, i) => (
-                    <span key={i} style={{ color: card.color }} className="text-xl font-bold">
-                      {card.display}
-                    </span>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Board */}
-              {result.state.board.length > 0 && (
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-400 font-medium">Board:</span>
-                  <div className="flex gap-1">
-                    {result.state.board.map((card, i) => (
-                      <span key={i} style={{ color: card.color }} className="text-xl font-bold">
-                        {card.display}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Recomendação Principal */}
-              <div 
-                className="text-center py-4 rounded-xl border-2"
-                style={{ 
-                  backgroundColor: result.recommendation.actionColor + '20',
-                  borderColor: result.recommendation.actionColor
-                }}
-              >
-                <div 
-                  className="text-4xl font-black"
-                  style={{ color: result.recommendation.actionColor }}
-                >
-                  {result.recommendation.quickAction}
-                </div>
-                {result.recommendation.amount > 0 && (
-                  <div className="text-xl font-bold text-white">${result.recommendation.amount}</div>
-                )}
-                <div className="text-sm text-gray-300 mt-2 font-medium">
-                  {result.recommendation.confidence} | EV: {result.analysis.ev}
-                </div>
-              </div>
-              
-              {/* Reasoning */}
-              <div className="text-sm text-gray-300 bg-gray-800/50 rounded-xl p-3 border border-gray-700">
-                {result.recommendation.reasoning}
-              </div>
-            </div>
-          ) : (
-            <div className="text-center py-6 text-gray-400 text-base font-medium">
-              Aguardando detecção de cartas...
-              <div className="text-sm mt-3 text-gray-500">
-                {monitorState.framesAnalyzed} frames analisados
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}
-
 // ==================== MAIN PAGE ====================
 
 export default function PokerRTA() {
@@ -583,72 +400,6 @@ export default function PokerRTA() {
   
   const [handHistory, setHandHistory] = useState<StreetHistory[]>([]);
   const [viewingHistoryStreet, setViewingHistoryStreet] = useState<string | null>(null);
-  
-  const [monitorState, setMonitorState] = useState({
-    isMonitoring: false,
-    framesAnalyzed: 0,
-    lastCapture: null as Date | null
-  });
-  
-  const autoMonitor = useAutoMonitor({
-    intervalMs: 2500,
-    onDetect: async (detected) => {
-      console.log('🎯 Cartas detectadas:', detected.heroCards, detected.board);
-      
-      setHeroCards(detected.heroCards);
-      setBoardCards(detected.board);
-      setPotSize(detected.potSize);
-      
-      let newStreet: 'preflop' | 'flop' | 'turn' | 'river' = 'preflop';
-      if (detected.board.length >= 3) newStreet = 'flop';
-      if (detected.board.length >= 4) newStreet = 'turn';
-      if (detected.board.length >= 5) newStreet = 'river';
-      setStreet(newStreet);
-      
-      try {
-        const response = await fetch('/api/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            heroCards: detected.heroCards,
-            board: detected.board,
-            potSize: detected.potSize,
-            betToCall: 0,
-            stackSize: 1000,
-            street: newStreet,
-            position: 'BTN',
-            numPlayers: 2
-          })
-        });
-        
-        const data = await response.json();
-        setResult(data);
-        
-        setHandHistory(prev => {
-          const newHistory = prev.filter(h => h.street !== newStreet);
-          newHistory.push({
-            street: newStreet,
-            board: [...detected.board],
-            result: data,
-            timestamp: Date.now()
-          });
-          return newHistory.sort((a, b) => {
-            const order = { preflop: 0, flop: 1, turn: 2, river: 3 };
-            return order[a.street] - order[b.street];
-          });
-        });
-      } catch (error) {
-        console.error('Auto-analysis error:', error);
-      }
-    },
-    onChange: (state) => {
-      setMonitorState({
-        isMonitoring: state.isMonitoring,
-        framesAnalyzed: state.framesAnalyzed,
-        lastCapture: state.lastCapture
-      });
-    }
-  });
   
   const analyze = useCallback(async () => {
     if (heroCards.length < 2) return;
@@ -778,14 +529,43 @@ export default function PokerRTA() {
     else if (street === 'turn') setStreet('river');
   };
   
+  // Handler para detecção automática
+  const handleAutoDetect = async (detected: { heroCards: string[]; board: string[]; potSize: number }) => {
+    setHeroCards(detected.heroCards);
+    setBoardCards(detected.board);
+    setPotSize(detected.potSize);
+    
+    let newStreet: 'preflop' | 'flop' | 'turn' | 'river' = 'preflop';
+    if (detected.board.length >= 3) newStreet = 'flop';
+    if (detected.board.length >= 4) newStreet = 'turn';
+    if (detected.board.length >= 5) newStreet = 'river';
+    setStreet(newStreet);
+    
+    try {
+      const response = await fetch('/api/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          heroCards: detected.heroCards,
+          board: detected.board,
+          potSize: detected.potSize,
+          betToCall: 0,
+          stackSize: 1000,
+          street: newStreet,
+          position: 'BTN',
+          numPlayers: 2
+        })
+      });
+      
+      const data = await response.json();
+      setResult(data);
+    } catch (error) {
+      console.error('Analysis error:', error);
+    }
+  };
+  
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white">
-      <AutoMonitorOverlay 
-        result={result}
-        monitorState={monitorState}
-        onStop={autoMonitor.stopMonitoring}
-      />
-      
       {/* Header */}
       <header className="border-b-2 border-gray-700 bg-black/60 backdrop-blur">
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
@@ -856,127 +636,14 @@ export default function PokerRTA() {
           <TabsContent value="auto" className="space-y-6">
             <Card className="bg-gray-800/50 border-2 border-gray-700 rounded-2xl">
               <CardHeader>
-                <CardTitle className="text-xl font-bold flex items-center gap-3">
-                  🤖 Monitoramento Automático
-                  {monitorState.isMonitoring && (
-                    <Badge className="bg-green-600 text-base px-3 py-1 animate-pulse">Ativo</Badge>
-                  )}
-                </CardTitle>
+                <CardTitle className="text-xl font-bold">🤖 Monitoramento Automático</CardTitle>
               </CardHeader>
               <CardContent className="space-y-5">
-                <div className={`rounded-2xl p-5 ${monitorState.isMonitoring ? 'bg-green-900/30 border-2 border-green-600' : 'bg-gray-700/30 border-2 border-gray-600'}`}>
-                  {monitorState.isMonitoring ? (
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 bg-green-500 rounded-full animate-pulse" />
-                        <span className="text-xl text-green-400 font-bold">Monitorando sua tela...</span>
-                      </div>
-                      <div className="text-lg text-gray-300">
-                        {monitorState.framesAnalyzed} frames analisados
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-lg text-gray-200">
-                      O modo automático monitora sua tela continuamente e detecta as cartas 
-                      <strong className="text-white"> sem você precisar fazer nada</strong>. Quando as cartas mudam, 
-                      a análise é atualizada automaticamente!
-                    </p>
-                  )}
-                </div>
-                
-                {!monitorState.isMonitoring && (
-                  <div className="space-y-4">
-                    <h4 className="text-lg font-bold text-gray-200">Como funciona:</h4>
-                    <div className="grid gap-4">
-                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
-                        <span className="text-3xl">1️⃣</span>
-                        <div>
-                          <p className="text-lg text-gray-200">Clique em <strong className="text-white">"Iniciar Monitoramento"</strong></p>
-                          <p className="text-gray-400">Selecione a janela do poker</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
-                        <span className="text-3xl">2️⃣</span>
-                        <div>
-                          <p className="text-lg text-gray-200">O app monitora automaticamente a cada 2.5 segundos</p>
-                          <p className="text-gray-400">Detecta mudanças nas cartas</p>
-                        </div>
-                      </div>
-                      <div className="flex items-start gap-4 bg-gray-700/20 rounded-xl p-4 border border-gray-600">
-                        <span className="text-3xl">3️⃣</span>
-                        <div>
-                          <p className="text-lg text-gray-200">Quando você recebe cartas, a análise aparece!</p>
-                          <p className="text-gray-400">Flop, turn e river são detectados automaticamente</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="flex gap-4">
-                  {!monitorState.isMonitoring ? (
-                    <Button 
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          console.log('Botão clicado!');
-                          await autoMonitor.startMonitoring();
-                        } catch (err: any) {
-                          console.error('Erro:', err);
-                          alert('Erro ao iniciar: ' + err.message);
-                        }
-                      }}
-                      className="bg-green-600 hover:bg-green-500 text-xl py-8 px-10 font-bold rounded-xl shadow-xl"
-                    >
-                      ▶️ Iniciar Monitoramento Automático
-                    </Button>
-                  ) : (
-                    <Button 
-                      type="button"
-                      onClick={autoMonitor.stopMonitoring}
-                      variant="destructive"
-                      className="text-xl py-8 px-10 font-bold rounded-xl"
-                    >
-                      ⏹️ Parar Monitoramento
-                    </Button>
-                  )}
-                </div>
-                
-                {monitorState.isMonitoring && result && (
-                  <div className="mt-6 border-t-2 border-gray-700 pt-6">
-                    <h4 className="text-base text-gray-400 mb-4 font-medium">Última análise detectada:</h4>
-                    <div className="flex items-center gap-6">
-                      <div className="flex gap-2">
-                        {result.state.heroCards.map((card, i) => (
-                          <CardBadge key={i} card={`${card.rank}${card.suit}`} />
-                        ))}
-                      </div>
-                      {result.state.board.length > 0 && (
-                        <>
-                          <span className="text-2xl text-gray-500">|</span>
-                          <div className="flex gap-2">
-                            {result.state.board.map((card, i) => (
-                              <CardBadge key={i} card={`${card.rank}${card.suit}`} />
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-            
-            <Card className="bg-blue-900/20 border-2 border-blue-700 rounded-2xl">
-              <CardContent className="py-5">
-                <div className="flex items-start gap-4">
-                  <span className="text-3xl">💡</span>
-                  <div className="text-lg text-blue-300">
-                    <strong>Dica:</strong> Deixe a janela do poker visível na tela. O monitoramento 
-                    funciona em segundo plano e você verá um painel no canto superior esquerdo com 
-                    a recomendação em tempo real!
-                  </div>
-                </div>
+                <p className="text-lg text-gray-200">
+                  O modo automático monitora sua tela continuamente e detecta as cartas 
+                  <strong className="text-white"> sem você precisar fazer nada</strong>.
+                </p>
+                <AutoMonitor onDetect={handleAutoDetect} />
               </CardContent>
             </Card>
           </TabsContent>
