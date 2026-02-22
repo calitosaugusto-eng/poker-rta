@@ -112,9 +112,14 @@ export function useAutoMonitor(config: AutoMonitorConfig) {
   };
 
   const startMonitoring = async () => {
+    // Verificar se está no navegador
+    if (typeof window === 'undefined' || !window.navigator?.mediaDevices?.getDisplayMedia) {
+      alert('Captura de tela não disponível. Use Chrome/Edge/Firefox com HTTPS.');
+      return;
+    }
+    
     try {
-      // Tenta obter o stream diretamente
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const stream = await window.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       
       streamRef.current = stream;
       

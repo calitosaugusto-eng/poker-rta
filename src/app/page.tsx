@@ -302,8 +302,14 @@ function ScreenCapture({ onCapture }: { onCapture: (imageData: string) => void }
   const [stream, setStream] = useState<MediaStream | null>(null);
   
   const startCapture = async () => {
+    // Verificar se está no navegador
+    if (typeof window === 'undefined' || !window.navigator?.mediaDevices?.getDisplayMedia) {
+      alert('Captura de tela não disponível. Use Chrome/Edge/Firefox com HTTPS.');
+      return;
+    }
+    
     try {
-      const mediaStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+      const mediaStream = await window.navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
       
       setStream(mediaStream);
       
