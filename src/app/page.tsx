@@ -20,9 +20,10 @@ import {
   SUIT_COLORS,
   cardToDisplay
 } from '@/lib/poker-engine';
+import { API_BASE_URL } from '@/lib/api-config';
 
 // Carregar componentes dinamicamente sem SSR
-const ScreenCapture = dynamic(() => import('@/components/ScreenCapture'), { ssr: false });
+const UniversalScreenCapture = dynamic(() => import('@/components/UniversalScreenCapture'), { ssr: false });
 const AutoMonitor = dynamic(() => import('@/components/AutoMonitor'), { ssr: false });
 
 // ==================== TIPOS ====================
@@ -407,7 +408,7 @@ export default function PokerRTA() {
     setIsAnalyzing(true);
     
     try {
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -450,7 +451,7 @@ export default function PokerRTA() {
     setDetectionMessage(null);
     
     try {
-      const detectResponse = await fetch('/api/detect', {
+      const detectResponse = await fetch(`${API_BASE_URL}/api/detect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageData })
@@ -469,7 +470,7 @@ export default function PokerRTA() {
         
         setDetectionMessage(`✅ Detectado via ${Array.isArray(usedApi) ? usedApi.join(', ') : usedApi}: ${state.heroCards.join(', ')}${state.board?.length ? ' | Board: ' + state.board.join(', ') : ''}`);
         
-        const analyzeResponse = await fetch('/api/analyze', {
+        const analyzeResponse = await fetch(`${API_BASE_URL}/api/analyze`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -542,7 +543,7 @@ export default function PokerRTA() {
     setStreet(newStreet);
     
     try {
-      const response = await fetch('/api/analyze', {
+      const response = await fetch(`${API_BASE_URL}/api/analyze`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -830,7 +831,7 @@ export default function PokerRTA() {
                   e clique em "Analisar Frame". As cartas serão detectadas automaticamente!
                 </p>
                 
-                <ScreenCapture onCapture={handleCapture} />
+                <UniversalScreenCapture onCapture={handleCapture} />
                 
                 {isAnalyzing && (
                   <div className="bg-blue-900/20 border-2 border-blue-700/50 rounded-2xl p-5 text-center">
