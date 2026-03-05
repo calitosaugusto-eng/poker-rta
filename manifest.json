@@ -1,0 +1,36 @@
+{
+  "name": "Poker RTA - Real-Time Assistance",
+  "short_name": "Poker RTA",
+  "description": "Assistente de poker em tempo real com IA",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#1a1a2e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ],
+  "categories": ["games", "utilities"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Análise Manual",
+      "url": "/?tab=manual",
+      "description": "Inserir cartas manualmente"
+    },
+    {
+      "name": "Captura de Tela",
+      "url": "/?tab=capture",
+      "description": "Capturar tela do poker"
+    }
+  ]
+}
