@@ -34,12 +34,34 @@ jobs:
         run: |
           wrangler deploy workers/index.ts
 
-      - name: Save Worker URL
-        run: |
-          echo "WORKER_URL=https://poker-rta-api.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev" >> $GITHUB_ENV
-          echo "API URL: https://poker-rta-api.${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.workers.dev"
+  # Job 2: Deploy Frontend to Cloudflare Pages
+  deploy-web:
+    runs-on: ubuntu-latest
+    name: Deploy Web App to Cloudflare Pages
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
 
-  # Job 2: Build Android APK
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Instalar dependências
+        run: bun install
+
+      - name: Build Next.js (static export)
+        run: bun run build
+
+      - name: Deploy to Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          npx wrangler pages deploy out --project-name=poker-rta
+
+  # Job 3: Build Android APK
   build-apk:
     runs-on: ubuntu-latest
     name: Build Android APK
