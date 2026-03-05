@@ -13,3 +13,11 @@ https://nextjs.org/telemetry
 ✓ Ready in 851ms
  GET / 200 in 2.7s (compile: 2.5s, render: 222ms)
  GET / 200 in 52ms (compile: 5ms, render: 47ms)
+⚠ Found a change in next.config.ts. Restarting the server to apply the changes...
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://21.0.2.80:3000
+- Environments: .env
+
+✓ Starting...
+✓ Ready in 941ms
